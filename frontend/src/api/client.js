@@ -87,6 +87,13 @@ export function createAvailability(doctorId, data) {
   return request(`/doctors/${doctorId}/availability`, { method: "POST", body: data });
 }
 
+export function updateAvailability(doctorId, availabilityId, data) {
+  return request(`/doctors/${doctorId}/availability/${availabilityId}`, {
+    method: "PUT",
+    body: data,
+  });
+}
+
 export function deleteAvailability(doctorId, availabilityId) {
   return request(`/doctors/${doctorId}/availability/${availabilityId}`, { method: "DELETE" });
 }

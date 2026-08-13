@@ -1,10 +1,15 @@
 /*
-  Lets a doctor add/remove weekly availability windows, e.g.
+  Lets a doctor add/edit/remove weekly availability windows, e.g.
   "Monday, 09:00-17:00, 30-minute slots". Used inside DoctorDashboard.
 */
 
 import { useEffect, useState } from "react";
-import { listAvailability, createAvailability, deleteAvailability } from "../api/client";
+import {
+  listAvailability,
+  createAvailability,
+  updateAvailability,
+  deleteAvailability,
+} from "../api/client";
 
 // Index 0 = Monday ... 6 = Sunday, matching the backend's day_of_week convention.
 const DAY_NAMES = [
@@ -17,15 +22,16 @@ const DAY_NAMES = [
   "Sunday",
 ];
 
+const DEFAULT_FORM = { dayOfWeek: "0", startTime: "09:00", endTime: "17:00", slotDuration: 30 };
+
 export default function AvailabilityManager({ doctorId }) {
   const [windows, setWindows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [dayOfWeek, setDayOfWeek] = useState("0");
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("17:00");
-  const [slotDuration, setSlotDuration] = useState(30);
+  // null = adding a new window; otherwise the id of the window being edited.
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(DEFAULT_FORM);
 
   function load() {
     setLoading(true);
@@ -37,17 +43,43 @@ export default function AvailabilityManager({ doctorId }) {
 
   useEffect(load, [doctorId]);
 
-  async function handleAdd(e) {
+  function updateField(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function startEditing(w) {
+    setEditingId(w.id);
+    setForm({
+      dayOfWeek: String(w.day_of_week),
+      startTime: w.start_time.slice(0, 5),
+      endTime: w.end_time.slice(0, 5),
+      slotDuration: w.slot_duration_minutes,
+    });
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setForm(DEFAULT_FORM);
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    // <input type="time"> gives "HH:MM"; the backend expects "HH:MM:SS".
+    const payload = {
+      day_of_week: Number(form.dayOfWeek),
+      start_time: `${form.startTime}:00`,
+      end_time: `${form.endTime}:00`,
+      slot_duration_minutes: Number(form.slotDuration),
+    };
     try {
-      // <input type="time"> gives "HH:MM"; the backend expects "HH:MM:SS".
-      await createAvailability(doctorId, {
-        day_of_week: Number(dayOfWeek),
-        start_time: `${startTime}:00`,
-        end_time: `${endTime}:00`,
-        slot_duration_minutes: Number(slotDuration),
-      });
+      if (editingId) {
+        await updateAvailability(doctorId, editingId, payload);
+        setEditingId(null);
+      } else {
+        await createAvailability(doctorId, payload);
+      }
+      setForm(DEFAULT_FORM);
       load();
     } catch (err) {
       setError(err.message);
@@ -58,6 +90,7 @@ export default function AvailabilityManager({ doctorId }) {
     setError("");
     try {
       await deleteAvailability(doctorId, id);
+      if (editingId === id) cancelEditing();
       load();
     } catch (err) {
       setError(err.message);
@@ -67,10 +100,10 @@ export default function AvailabilityManager({ doctorId }) {
   return (
     <div className="card availability-manager">
       <h3>Set Availability</h3>
-      <form onSubmit={handleAdd} className="availability-form">
+      <form onSubmit={handleSubmit} className="availability-form">
         <label>
           Day
-          <select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)}>
+          <select value={form.dayOfWeek} onChange={(e) => updateField("dayOfWeek", e.target.value)}>
             {DAY_NAMES.map((name, index) => (
               <option key={index} value={index}>
                 {name}
@@ -82,8 +115,8 @@ export default function AvailabilityManager({ doctorId }) {
           Start time
           <input
             type="time"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
+            value={form.startTime}
+            onChange={(e) => updateField("startTime", e.target.value)}
             required
           />
         </label>
@@ -91,8 +124,8 @@ export default function AvailabilityManager({ doctorId }) {
           End time
           <input
             type="time"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
+            value={form.endTime}
+            onChange={(e) => updateField("endTime", e.target.value)}
             required
           />
         </label>
@@ -102,12 +135,19 @@ export default function AvailabilityManager({ doctorId }) {
             type="number"
             min="5"
             step="5"
-            value={slotDuration}
-            onChange={(e) => setSlotDuration(e.target.value)}
+            value={form.slotDuration}
+            onChange={(e) => updateField("slotDuration", e.target.value)}
             required
           />
         </label>
-        <button type="submit">Add window</button>
+        <div className="button-row">
+          <button type="submit">{editingId ? "Save changes" : "Add window"}</button>
+          {editingId && (
+            <button type="button" onClick={cancelEditing}>
+              Cancel edit
+            </button>
+          )}
+        </div>
       </form>
 
       {error && <p className="error">{error}</p>}
@@ -119,14 +159,19 @@ export default function AvailabilityManager({ doctorId }) {
       ) : (
         <ul className="availability-list">
           {windows.map((w) => (
-            <li key={w.id}>
+            <li key={w.id} className={editingId === w.id ? "editing" : ""}>
               <span>
                 {DAY_NAMES[w.day_of_week]} {w.start_time.slice(0, 5)}–{w.end_time.slice(0, 5)}{" "}
                 <span className="muted">({w.slot_duration_minutes} min slots)</span>
               </span>
-              <button type="button" onClick={() => handleDelete(w.id)}>
-                Remove
-              </button>
+              <div className="button-row">
+                <button type="button" onClick={() => startEditing(w)}>
+                  Edit
+                </button>
+                <button type="button" onClick={() => handleDelete(w.id)}>
+                  Remove
+                </button>
+              </div>
             </li>
           ))}
         </ul>
