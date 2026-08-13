@@ -1,0 +1,17 @@
+# Environment variables (contains secrets — never commit this)
+.env
+
+# Python
+backend/venv/
+__pycache__/
+*.pyc
+
+# Node / React
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Editor/OS
+.DS_Store
+.vscode/
+.idea/
