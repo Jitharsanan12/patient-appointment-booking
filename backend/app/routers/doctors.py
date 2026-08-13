@@ -34,6 +34,29 @@ def list_doctors(
     ]
 
 
+@router.get("/me", response_model=schemas.DoctorOut)
+def get_my_doctor_profile(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.UserRole.doctor)),
+):
+    """Lets a logged-in doctor find their own doctor_id (needed to manage their availability)."""
+    doctor = (
+        db.query(models.Doctor)
+        .options(joinedload(models.Doctor.user))
+        .filter(models.Doctor.user_id == current_user.id)
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor profile not found for this account")
+
+    return schemas.DoctorOut(
+        id=doctor.id,
+        full_name=doctor.user.full_name,
+        specialization=doctor.specialization,
+        bio=doctor.bio,
+    )
+
+
 def _get_doctor_or_404(db: Session, doctor_id: int) -> models.Doctor:
     doctor = db.query(models.Doctor).filter(models.Doctor.id == doctor_id).first()
     if not doctor:
