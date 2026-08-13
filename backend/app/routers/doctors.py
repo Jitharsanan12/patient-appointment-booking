@@ -148,19 +148,112 @@ def delete_availability(
     return None
 
 
+# ---------- One-off unavailable dates (doctor-only, own profile) ----------
+
+@router.post(
+    "/{doctor_id}/unavailable-dates",
+    response_model=schemas.UnavailableDateOut,
+    status_code=201,
+)
+def create_unavailable_date(
+    doctor_id: int,
+    payload: schemas.UnavailableDateCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.UserRole.doctor)),
+):
+    _get_doctor_or_404(db, doctor_id)
+    _require_own_doctor_profile(current_user, doctor_id, db)
+
+    existing = (
+        db.query(models.AvailabilityOverride)
+        .filter(
+            models.AvailabilityOverride.doctor_id == doctor_id,
+            models.AvailabilityOverride.date == payload.date,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="This date is already marked unavailable")
+
+    override = models.AvailabilityOverride(
+        doctor_id=doctor_id, date=payload.date, reason=payload.reason
+    )
+    db.add(override)
+    db.commit()
+    db.refresh(override)
+    return override
+
+
+@router.get("/{doctor_id}/unavailable-dates", response_model=list[schemas.UnavailableDateOut])
+def list_unavailable_dates(
+    doctor_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Any logged-in user can view a doctor's blocked dates (needed so patients see why a date has no slots)."""
+    _get_doctor_or_404(db, doctor_id)
+    return (
+        db.query(models.AvailabilityOverride)
+        .filter(models.AvailabilityOverride.doctor_id == doctor_id)
+        .order_by(models.AvailabilityOverride.date)
+        .all()
+    )
+
+
+@router.delete("/{doctor_id}/unavailable-dates/{override_id}", status_code=204)
+def delete_unavailable_date(
+    doctor_id: int,
+    override_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.UserRole.doctor)),
+):
+    _get_doctor_or_404(db, doctor_id)
+    _require_own_doctor_profile(current_user, doctor_id, db)
+
+    override = (
+        db.query(models.AvailabilityOverride)
+        .filter(
+            models.AvailabilityOverride.id == override_id,
+            models.AvailabilityOverride.doctor_id == doctor_id,
+        )
+        .first()
+    )
+    if not override:
+        raise HTTPException(status_code=404, detail="Unavailable date not found")
+
+    db.delete(override)
+    db.commit()
+    return None
+
+
 # ---------- Computing actual bookable slots ----------
 
 def compute_available_slots(db: Session, doctor_id: int, target_date: date) -> list[dict]:
     """
     Builds the list of bookable slots for a doctor on a specific date:
-    1. Find the doctor's recurring availability windows for that day of the week.
-    2. Chop each window into slot_duration_minutes-sized pieces.
-    3. Drop any piece that's already booked (a "scheduled" appointment exists then).
-    4. Drop any piece that's already in the past.
+    1. Check whether the doctor has marked target_date as a one-off
+       unavailable day (AvailabilityOverride) — if so, there are no slots
+       at all, no matter what their weekly pattern says.
+    2. Find the doctor's recurring availability windows for that day of the week.
+    3. Chop each window into slot_duration_minutes-sized pieces.
+    4. Drop any piece that's already booked (a "scheduled" appointment exists then).
+    5. Drop any piece that's already in the past.
     Returns a list of {"start_time": datetime, "end_time": datetime} dicts,
     sorted earliest first. This is reused by both the /available-slots
     endpoint AND the booking endpoint (which uses it to validate requests).
     """
+    is_blocked = (
+        db.query(models.AvailabilityOverride)
+        .filter(
+            models.AvailabilityOverride.doctor_id == doctor_id,
+            models.AvailabilityOverride.date == target_date,
+        )
+        .first()
+        is not None
+    )
+    if is_blocked:
+        return []
+
     day_of_week = target_date.weekday()  # Monday=0 ... Sunday=6, same as our storage convention
 
     windows = (

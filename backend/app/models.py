@@ -12,6 +12,7 @@ from sqlalchemy import (
     String,
     DateTime,
     Time,
+    Date,
     ForeignKey,
     Enum,
     UniqueConstraint,
@@ -73,6 +74,9 @@ class Doctor(Base):
     availability_windows = relationship(
         "Availability", back_populates="doctor", cascade="all, delete-orphan"
     )
+    unavailable_dates = relationship(
+        "AvailabilityOverride", back_populates="doctor", cascade="all, delete-orphan"
+    )
 
 
 class Availability(Base):
@@ -95,6 +99,31 @@ class Availability(Base):
     slot_duration_minutes = Column(Integer, nullable=False, default=30)
 
     doctor = relationship("Doctor", back_populates="availability_windows")
+
+
+class AvailabilityOverride(Base):
+    """
+    A one-off exception that blocks a doctor's normal weekly availability
+    for a single specific date (e.g. a public holiday or a day off) —
+    regardless of what their recurring Availability windows say for that
+    day of the week.
+
+    We only model "block this date" (not "add extra hours on this date")
+    since that's what was asked for; the UniqueConstraint stops a doctor
+    from accidentally creating the same override twice.
+    """
+    __tablename__ = "availability_overrides"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False)
+    date = Column(Date, nullable=False)
+    reason = Column(String, nullable=True)
+
+    doctor = relationship("Doctor", back_populates="unavailable_dates")
+
+    __table_args__ = (
+        UniqueConstraint("doctor_id", "date", name="uq_doctor_override_date"),
+    )
 
 
 class Appointment(Base):
