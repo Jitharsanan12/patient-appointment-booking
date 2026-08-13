@@ -80,6 +80,10 @@ class AdminCreateDoctorResponse(BaseModel):
     # Only ever returned here, once, at creation time — never stored in
     # plain text and never retrievable again after this response.
     temporary_password: str
+    # Whether the welcome email was successfully sent via Resend — false
+    # doesn't mean the doctor account wasn't created, just that the admin
+    # should share temporary_password with them some other way.
+    email_sent: bool
 
 
 # ---------- Availability ----------

@@ -25,6 +25,7 @@ patient-appointment-booking/
 │   │   ├── models.py       # Database tables (User, Doctor, Appointment)
 │   │   ├── schemas.py      # Request/response data shapes
 │   │   ├── auth.py         # Password hashing, JWT creation/verification
+│   │   ├── email_utils.py  # Sends transactional emails via Resend
 │   │   └── routers/        # API endpoints, grouped by feature
 │   ├── requirements.txt
 │   └── venv/                # Python virtual environment (not committed)
@@ -90,6 +91,20 @@ patient-appointment-booking/
    VALUES ('admin@example.com', '<bcrypt-hashed-password>', 'Admin Name', 'admin');
    ```
 
+6. (Optional) Set up email delivery for doctor welcome emails. When an admin creates a doctor account, the system emails them their login + temporary password via [Resend](https://resend.com). This step is optional — if you skip it, doctor creation still works exactly the same, the password just won't be emailed (it's always shown on screen to the admin either way).
+
+   1. Sign up for a free Resend account at [resend.com](https://resend.com) (the free tier is enough for this).
+   2. In the Resend dashboard, go to **API Keys** and create one.
+   3. Add it to your **project root** `.env` file, alongside `DATABASE_URL`:
+
+      ```
+      RESEND_API_KEY=re_your_key_here
+      ```
+
+   4. **Important limitation while testing:** this project sends from Resend's shared `onboarding@resend.dev` address, which requires no setup — but without your own verified sending domain, Resend will only actually deliver to **the email address you signed up to Resend with**. Sending to any other address (like a real doctor's email) will fail with an "Invalid `to` field" error, and the admin dashboard will show that the email couldn't be sent (falling back to the on-screen password, which always still works).
+      - To test the email actually arriving, create a doctor using your own Resend account's email address, or Resend's special test address `delivered@resend.dev` (always reports success, sends nowhere real).
+      - To email real doctors at their real addresses, verify your own domain in the Resend dashboard and change `FROM_EMAIL` in `backend/app/email_utils.py` to an address on that domain.
+
 ## Frontend setup
 
 1. Install dependencies:
@@ -120,7 +135,7 @@ The public Register page only ever creates a **patient** account — there's no 
 ### Account roles
 
 - **Patient**: self-registers via the public Register page.
-- **Doctor**: created by an admin, via the "Manage Doctors" section of the admin dashboard (or directly with `POST /admin/doctors`). The admin sets the doctor's email/name/specialization and either types a temporary password or lets the backend generate one — it's shown once in the response, so share it with the doctor before navigating away.
+- **Doctor**: created by an admin, via the "Manage Doctors" section of the admin dashboard (or directly with `POST /admin/doctors`). The admin sets the doctor's email/name/specialization and either types a temporary password or lets the backend generate one. If Resend is configured (see step 6 of Backend setup), it's emailed to the doctor automatically; either way it's also shown once in the admin dashboard as a fallback, so share it with the doctor before navigating away if the email didn't go through.
 - **Admin**: exactly one, created once via `seed_admin.py` (see step 5 of Backend setup above). There's no API endpoint that creates an admin — that's intentional, so an admin account can never be created by anyone who only has API access.
 
 ## Notes on the current setup

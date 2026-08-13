@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas, auth
 from app.database import get_db
+from app.email_utils import send_doctor_welcome_email
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -52,6 +53,12 @@ def create_doctor(
     db.commit()
     db.refresh(doctor_profile)
 
+    # Email the doctor their login credentials. This happens AFTER the
+    # account is safely committed to the database, and its result never
+    # blocks the response — if it fails, email_sent comes back False and
+    # the admin still has temporary_password on screen to share manually.
+    email_sent = send_doctor_welcome_email(new_user.email, new_user.full_name, password)
+
     return schemas.AdminCreateDoctorResponse(
         id=doctor_profile.id,
         email=new_user.email,
@@ -59,4 +66,5 @@ def create_doctor(
         specialization=doctor_profile.specialization,
         bio=doctor_profile.bio,
         temporary_password=password,
+        email_sent=email_sent,
     )
