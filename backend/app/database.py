@@ -23,7 +23,12 @@ if not DATABASE_URL:
     )
 
 # The engine is the object SQLAlchemy uses to actually talk to the database.
-engine = create_engine(DATABASE_URL)
+# pool_pre_ping tests each pooled connection with a lightweight query right
+# before it's reused, and transparently reconnects if it's gone stale —
+# Neon (and most managed Postgres) can close idle connections after a
+# period of inactivity, which otherwise surfaces as a confusing
+# "SSL connection has been closed unexpectedly" error on the next request.
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 # Each request will get its own database "session" (a workspace for queries)
 # created from this factory.

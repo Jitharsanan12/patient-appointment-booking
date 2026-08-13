@@ -7,8 +7,8 @@ A full-stack appointment booking app: patients book appointments with doctors, d
 ## Features
 
 - Patients: browse doctors, book appointments (date/time + reason), view their own upcoming appointments, cancel them
-- Doctors: view their assigned appointments, mark them completed or cancelled
-- Admins: view every appointment in the system
+- Doctors: view their assigned appointments, mark them completed or cancelled; set weekly availability and block one-off unavailable dates
+- Admins: view every appointment in the system; create doctor accounts
 - No double-booking the same doctor at the same date/time
 - No booking a date/time in the past
 - Only the relevant patient, assigned doctor, or an admin can view a given appointment's details
@@ -75,6 +75,21 @@ patient-appointment-booking/
 
    The API is now running at `http://127.0.0.1:8000`. Interactive docs are at `http://127.0.0.1:8000/docs`. Tables are created automatically on startup if they don't already exist.
 
+5. Create the one admin account. Public self-signup only ever creates patient accounts (see "Account roles" below), so the very first admin has to be created directly against the database instead of through the API. From the `backend/` folder, with the server stopped or running (either is fine):
+
+   ```bash
+   ./venv/bin/python seed_admin.py
+   ```
+
+   It'll prompt for an email, full name, and password, and refuses to run again once an admin already exists — so you can't accidentally create a second one.
+
+   If you'd rather do it by hand in SQL instead of running the script, you can insert the row directly (replace the placeholder hash — see the script's use of `auth.hash_password` for how a real one is generated; never store a plain-text password):
+
+   ```sql
+   INSERT INTO users (email, hashed_password, full_name, role)
+   VALUES ('admin@example.com', '<bcrypt-hashed-password>', 'Admin Name', 'admin');
+   ```
+
 ## Frontend setup
 
 1. Install dependencies:
@@ -100,7 +115,13 @@ patient-appointment-booking/
 
 ## Using the app
 
-Register an account as a patient, doctor, or admin from the Register page, then log in. (For learning purposes, this project lets anyone self-register with any role — in a real production system, doctor/admin accounts would be created separately by an administrator instead of being open to public signup.)
+The public Register page only ever creates a **patient** account — there's no role picker. Log in as a patient to browse doctors and book appointments.
+
+### Account roles
+
+- **Patient**: self-registers via the public Register page.
+- **Doctor**: created by an admin, via the "Manage Doctors" section of the admin dashboard (or directly with `POST /admin/doctors`). The admin sets the doctor's email/name/specialization and either types a temporary password or lets the backend generate one — it's shown once in the response, so share it with the doctor before navigating away.
+- **Admin**: exactly one, created once via `seed_admin.py` (see step 5 of Backend setup above). There's no API endpoint that creates an admin — that's intentional, so an admin account can never be created by anyone who only has API access.
 
 ## Notes on the current setup
 

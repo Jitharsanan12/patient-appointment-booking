@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
-from app.routers import auth, doctors, appointments
+from app.routers import auth, doctors, appointments, admin
 
 # Creates all tables defined in models.py if they don't already exist.
 # (Fine for development; for a production app you'd use a migration tool
@@ -33,6 +33,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(doctors.router)
 app.include_router(appointments.router)
+app.include_router(admin.router)
 
 
 @app.get("/")

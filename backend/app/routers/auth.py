@@ -1,10 +1,12 @@
 """
 Endpoints for registering and logging in.
 
-NOTE on roles: to keep this project simple for learning purposes, /register
-lets the caller pick any role (patient, doctor, or admin). In a real
-production system you would NOT let people self-register as "doctor" or
-"admin" — those accounts would be created separately by an administrator.
+NOTE on roles: public self-signup (this /register endpoint) can ONLY ever
+create a "patient" account — the role is hard-coded below and the request
+schema (schemas.PatientRegister) doesn't even have a role field, so there's
+nothing a client could send to change that. Doctor accounts are created by
+an admin via POST /admin/doctors (see routers/admin.py); the one admin
+account is created separately via backend/seed_admin.py, not through the API.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,32 +19,19 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED)
-def register(payload: schemas.UserRegister, db: Session = Depends(get_db)):
+def register(payload: schemas.PatientRegister, db: Session = Depends(get_db)):
     # Make sure this email isn't already taken.
     existing_user = db.query(models.User).filter(models.User.email == payload.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email is already registered")
 
-    if payload.role == models.UserRole.doctor and not payload.specialization:
-        raise HTTPException(status_code=400, detail="Doctors must provide a specialization")
-
     new_user = models.User(
         email=payload.email,
         hashed_password=auth.hash_password(payload.password),
         full_name=payload.full_name,
-        role=payload.role,
+        role=models.UserRole.patient,
     )
     db.add(new_user)
-    db.flush()  # assigns new_user.id without fully committing yet
-
-    if payload.role == models.UserRole.doctor:
-        doctor_profile = models.Doctor(
-            user_id=new_user.id,
-            specialization=payload.specialization,
-            bio=payload.bio,
-        )
-        db.add(doctor_profile)
-
     db.commit()
     db.refresh(new_user)
     return new_user

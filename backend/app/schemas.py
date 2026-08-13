@@ -16,14 +16,16 @@ from app.models import UserRole, AppointmentStatus
 
 # ---------- Auth / Users ----------
 
-class UserRegister(BaseModel):
+class PatientRegister(BaseModel):
+    """
+    Input for the PUBLIC /auth/register endpoint. Deliberately has NO role
+    field at all — public self-signup can only ever create a patient
+    account. Doctor and admin accounts are created through separate,
+    privileged paths (see AdminCreateDoctorRequest and seed_admin.py).
+    """
     email: EmailStr
     password: str
     full_name: str
-    role: UserRole
-    # Only required when role == "doctor"
-    specialization: Optional[str] = None
-    bio: Optional[str] = None
 
 
 class UserOut(BaseModel):
@@ -56,6 +58,28 @@ class DoctorOut(BaseModel):
     bio: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AdminCreateDoctorRequest(BaseModel):
+    """Input for the admin-only POST /admin/doctors endpoint."""
+    email: EmailStr
+    full_name: str
+    specialization: str
+    bio: Optional[str] = None
+    # If the admin doesn't supply one, the backend generates a random
+    # temporary password (the doctor should change it after first login).
+    password: Optional[str] = None
+
+
+class AdminCreateDoctorResponse(BaseModel):
+    id: int  # the new doctor's id (from the doctors table)
+    email: EmailStr
+    full_name: str
+    specialization: str
+    bio: Optional[str] = None
+    # Only ever returned here, once, at creation time — never stored in
+    # plain text and never retrievable again after this response.
+    temporary_password: str
 
 
 # ---------- Availability ----------
