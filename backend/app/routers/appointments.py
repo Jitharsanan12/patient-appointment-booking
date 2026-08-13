@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app import models, schemas, auth
 from app.database import get_db
+from app.routers.doctors import compute_available_slots
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -61,6 +62,19 @@ def book_appointment(
     doctor = db.query(models.Doctor).filter(models.Doctor.id == payload.doctor_id).first()
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
+
+    # Rule: the requested time must be one of the doctor's actual bookable
+    # slots (derived from their availability windows, minus anything already
+    # booked). This reuses the exact same logic that powers the
+    # /doctors/{id}/available-slots endpoint the frontend calls, so what the
+    # patient sees as "available" is always what the backend will accept.
+    available_slots = compute_available_slots(db, payload.doctor_id, appointment_date.date())
+    if not any(slot["start_time"] == appointment_date for slot in available_slots):
+        raise HTTPException(
+            status_code=400,
+            detail="This time is not an available slot for this doctor. "
+            "Please choose one of the doctor's open slots.",
+        )
 
     # Rule: no double-booking the same doctor at the same date/time.
     # (Only counts appointments that are still "scheduled" — a cancelled

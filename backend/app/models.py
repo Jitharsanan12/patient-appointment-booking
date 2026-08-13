@@ -11,6 +11,7 @@ from sqlalchemy import (
     Integer,
     String,
     DateTime,
+    Time,
     ForeignKey,
     Enum,
     UniqueConstraint,
@@ -69,6 +70,31 @@ class Doctor(Base):
 
     user = relationship("User", back_populates="doctor_profile")
     appointments = relationship("Appointment", back_populates="doctor")
+    availability_windows = relationship(
+        "Availability", back_populates="doctor", cascade="all, delete-orphan"
+    )
+
+
+class Availability(Base):
+    """
+    A recurring weekly window during which a doctor is available, e.g.
+    "every Monday, 09:00-17:00, in 30-minute slots". A doctor can have
+    multiple rows (e.g. Monday mornings AND Wednesday afternoons).
+
+    We store a day of the week rather than specific dates so the doctor
+    sets their schedule once and it repeats every week. day_of_week uses
+    the same convention as Python's date.weekday(): 0=Monday ... 6=Sunday.
+    """
+    __tablename__ = "availability"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False)
+    day_of_week = Column(Integer, nullable=False)
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    slot_duration_minutes = Column(Integer, nullable=False, default=30)
+
+    doctor = relationship("Doctor", back_populates="availability_windows")
 
 
 class Appointment(Base):

@@ -6,10 +6,10 @@ accidentally send a user's hashed_password back in an API response, so
 UserOut simply doesn't include that field.
 """
 
-from datetime import datetime
+from datetime import datetime, time
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, model_validator
 
 from app.models import UserRole, AppointmentStatus
 
@@ -56,6 +56,39 @@ class DoctorOut(BaseModel):
     bio: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ---------- Availability ----------
+
+class AvailabilityCreate(BaseModel):
+    # 0=Monday ... 6=Sunday, matching Python's date.weekday()
+    day_of_week: int = Field(ge=0, le=6)
+    start_time: time
+    end_time: time
+    slot_duration_minutes: int = Field(default=30, gt=0)
+
+    @model_validator(mode="after")
+    def check_time_order(self):
+        if self.end_time <= self.start_time:
+            raise ValueError("end_time must be after start_time")
+        return self
+
+
+class AvailabilityOut(BaseModel):
+    id: int
+    doctor_id: int
+    day_of_week: int
+    start_time: time
+    end_time: time
+    slot_duration_minutes: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SlotOut(BaseModel):
+    """One bookable slot: a specific start/end datetime on the requested date."""
+    start_time: datetime
+    end_time: datetime
 
 
 # ---------- Appointments ----------
