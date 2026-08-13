@@ -122,6 +122,46 @@ def list_availability(
     )
 
 
+@router.put("/{doctor_id}/availability/{availability_id}", response_model=schemas.AvailabilityOut)
+def update_availability(
+    doctor_id: int,
+    availability_id: int,
+    payload: schemas.AvailabilityCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.UserRole.doctor)),
+):
+    """
+    Edits an existing availability window in place, rather than deleting
+    and recreating it. Note: this only changes the recurring weekly
+    pattern going forward — it does NOT touch any appointments already
+    booked under the old window. If a doctor narrows their hours, existing
+    bookings outside the new range stay exactly as they were; only NEW
+    bookings are validated against the updated window.
+    """
+    _get_doctor_or_404(db, doctor_id)
+    _require_own_doctor_profile(current_user, doctor_id, db)
+
+    availability = (
+        db.query(models.Availability)
+        .filter(
+            models.Availability.id == availability_id,
+            models.Availability.doctor_id == doctor_id,
+        )
+        .first()
+    )
+    if not availability:
+        raise HTTPException(status_code=404, detail="Availability window not found")
+
+    availability.day_of_week = payload.day_of_week
+    availability.start_time = payload.start_time
+    availability.end_time = payload.end_time
+    availability.slot_duration_minutes = payload.slot_duration_minutes
+
+    db.commit()
+    db.refresh(availability)
+    return availability
+
+
 @router.delete("/{doctor_id}/availability/{availability_id}", status_code=204)
 def delete_availability(
     doctor_id: int,
