@@ -73,6 +73,28 @@ export function listDoctors() {
   return request("/doctors");
 }
 
+export function getMyDoctorProfile() {
+  return request("/doctors/me");
+}
+
+// ---------- Availability ----------
+
+export function listAvailability(doctorId) {
+  return request(`/doctors/${doctorId}/availability`);
+}
+
+export function createAvailability(doctorId, data) {
+  return request(`/doctors/${doctorId}/availability`, { method: "POST", body: data });
+}
+
+export function deleteAvailability(doctorId, availabilityId) {
+  return request(`/doctors/${doctorId}/availability/${availabilityId}`, { method: "DELETE" });
+}
+
+export function getAvailableSlots(doctorId, date) {
+  return request(`/doctors/${doctorId}/available-slots?date=${date}`);
+}
+
 // ---------- Appointments ----------
 
 export function bookAppointment(data) {

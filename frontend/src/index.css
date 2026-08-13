@@ -162,3 +162,80 @@ select {
   padding: 0.6rem;
   border-bottom: 1px solid #eee;
 }
+
+button:disabled {
+  background: #b7bcef;
+  cursor: not-allowed;
+}
+
+/* Doctor availability manager */
+
+.availability-manager {
+  margin-bottom: 1.5rem;
+}
+
+.availability-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.availability-form button {
+  height: 2.4rem;
+}
+
+.availability-list {
+  list-style: none;
+  margin: 1rem 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.availability-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f5f6fa;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
+.availability-list button {
+  background: #d32f2f;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.availability-list button:hover {
+  background: #b71c1c;
+}
+
+/* Patient slot picker */
+
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.slot-button {
+  background: white;
+  color: #1a1a2e;
+  border: 1px solid #ccc;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.slot-button:hover {
+  background: #e3ecff;
+}
+
+.slot-selected {
+  background: #4a5cf5;
+  color: white;
+  border-color: #4a5cf5;
+}

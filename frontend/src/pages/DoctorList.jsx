@@ -1,10 +1,15 @@
 /*
   Home page for patients: shows every doctor, with a "Book" button that
-  opens a small inline form to pick a date/time and reason.
+  opens a booking flow: pick a date, then pick one of the doctor's actual
+  open time slots for that date (fetched from the backend), then confirm.
 */
 
 import { useEffect, useState } from "react";
-import { listDoctors, bookAppointment } from "../api/client";
+import { listDoctors, bookAppointment, getAvailableSlots } from "../api/client";
+
+function formatSlotTime(isoString) {
+  return new Date(isoString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
 
 export default function DoctorList() {
   const [doctors, setDoctors] = useState([]);
@@ -15,6 +20,11 @@ export default function DoctorList() {
   const [bookingDoctorId, setBookingDoctorId] = useState(null);
   const [date, setDate] = useState("");
   const [reason, setReason] = useState("");
+
+  const [slots, setSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+
   const [formError, setFormError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -29,19 +39,41 @@ export default function DoctorList() {
     setBookingDoctorId(doctorId);
     setDate("");
     setReason("");
+    setSlots([]);
+    setSelectedSlot(null);
     setFormError("");
     setSuccessMessage("");
+  }
+
+  // Whenever the chosen date changes, fetch that doctor's actual open
+  // slots for it — this is the list the patient can pick from.
+  function handleDateChange(doctorId, newDate) {
+    setDate(newDate);
+    setSelectedSlot(null);
+    setSlots([]);
+    if (!newDate) return;
+
+    setSlotsLoading(true);
+    setFormError("");
+    getAvailableSlots(doctorId, newDate)
+      .then(setSlots)
+      .catch((err) => setFormError(err.message))
+      .finally(() => setSlotsLoading(false));
   }
 
   async function handleBook(e, doctorId) {
     e.preventDefault();
     setFormError("");
+    if (!selectedSlot) {
+      setFormError("Please select a time slot.");
+      return;
+    }
     try {
-      // <input type="datetime-local"> gives a value like "2026-09-01T10:00"
-      // with no timezone. new Date(...).toISOString() converts it to a
-      // proper UTC timestamp the backend expects.
-      const isoDate = new Date(date).toISOString();
-      await bookAppointment({ doctor_id: doctorId, appointment_date: isoDate, reason });
+      await bookAppointment({
+        doctor_id: doctorId,
+        appointment_date: selectedSlot.start_time,
+        reason,
+      });
       setSuccessMessage("Appointment booked!");
       setBookingDoctorId(null);
     } catch (err) {
@@ -66,14 +98,45 @@ export default function DoctorList() {
             {bookingDoctorId === doctor.id ? (
               <form onSubmit={(e) => handleBook(e, doctor.id)}>
                 <label>
-                  Date & time
+                  Date
                   <input
-                    type="datetime-local"
+                    type="date"
                     value={date}
-                    onChange={(e) => setDate(e.target.value)}
+                    onChange={(e) => handleDateChange(doctor.id, e.target.value)}
+                    min={new Date().toISOString().slice(0, 10)}
                     required
                   />
                 </label>
+
+                {date && (
+                  <div>
+                    <label>Available times</label>
+                    {slotsLoading ? (
+                      <p className="muted">Loading slots...</p>
+                    ) : slots.length === 0 ? (
+                      <p className="muted">
+                        No open slots on this date. Try another date.
+                      </p>
+                    ) : (
+                      <div className="slot-grid">
+                        {slots.map((slot) => (
+                          <button
+                            type="button"
+                            key={slot.start_time}
+                            className={
+                              "slot-button" +
+                              (selectedSlot?.start_time === slot.start_time ? " slot-selected" : "")
+                            }
+                            onClick={() => setSelectedSlot(slot)}
+                          >
+                            {formatSlotTime(slot.start_time)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <label>
                   Reason
                   <input
@@ -84,7 +147,9 @@ export default function DoctorList() {
                 </label>
                 {formError && <p className="error">{formError}</p>}
                 <div className="button-row">
-                  <button type="submit">Confirm booking</button>
+                  <button type="submit" disabled={!selectedSlot}>
+                    Confirm booking
+                  </button>
                   <button type="button" onClick={() => setBookingDoctorId(null)}>
                     Cancel
                   </button>

@@ -4,12 +4,14 @@
 */
 
 import { useEffect, useState } from "react";
-import { myAssignedAppointments, updateAppointmentStatus } from "../api/client";
+import { myAssignedAppointments, updateAppointmentStatus, getMyDoctorProfile } from "../api/client";
+import AvailabilityManager from "../components/AvailabilityManager";
 
 export default function DoctorDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [doctorId, setDoctorId] = useState(null);
 
   function load() {
     setLoading(true);
@@ -20,6 +22,9 @@ export default function DoctorDashboard() {
   }
 
   useEffect(load, []);
+  useEffect(() => {
+    getMyDoctorProfile().then((profile) => setDoctorId(profile.id));
+  }, []);
 
   async function handleStatusChange(id, status) {
     setError("");
@@ -35,6 +40,8 @@ export default function DoctorDashboard() {
 
   return (
     <div>
+      {doctorId && <AvailabilityManager doctorId={doctorId} />}
+
       <h2>My Schedule</h2>
       {error && <p className="error">{error}</p>}
       {appointments.length === 0 && <p>No appointments assigned to you yet.</p>}
