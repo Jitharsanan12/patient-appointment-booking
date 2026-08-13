@@ -103,10 +103,13 @@ export default function ManageDoctors() {
       {error && <p className="error">{error}</p>}
 
       {createdDoctor && (
-        <p className="success">
-          Created {createdDoctor.full_name} ({createdDoctor.email}). Temporary password:{" "}
-          <strong>{createdDoctor.temporary_password}</strong> — share this with them now, it
-          won't be shown again.
+        <p className={createdDoctor.email_sent ? "success" : "error"}>
+          Created {createdDoctor.full_name} ({createdDoctor.email}).{" "}
+          {createdDoctor.email_sent
+            ? "Their login details were emailed to them."
+            : "Could not send the welcome email — share these with them yourself:"}{" "}
+          Temporary password: <strong>{createdDoctor.temporary_password}</strong> — it won't be
+          shown again.
         </p>
       )}
 
