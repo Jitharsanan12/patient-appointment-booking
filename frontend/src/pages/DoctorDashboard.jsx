@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { myAssignedAppointments, updateAppointmentStatus, getMyDoctorProfile } from "../api/client";
 import AvailabilityManager from "../components/AvailabilityManager";
+import UnavailableDatesManager from "../components/UnavailableDatesManager";
 
 export default function DoctorDashboard() {
   const [appointments, setAppointments] = useState([]);
@@ -40,7 +41,12 @@ export default function DoctorDashboard() {
 
   return (
     <div>
-      {doctorId && <AvailabilityManager doctorId={doctorId} />}
+      {doctorId && (
+        <>
+          <AvailabilityManager doctorId={doctorId} />
+          <UnavailableDatesManager doctorId={doctorId} />
+        </>
+      )}
 
       <h2>My Schedule</h2>
       {error && <p className="error">{error}</p>}

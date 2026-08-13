@@ -95,6 +95,20 @@ export function getAvailableSlots(doctorId, date) {
   return request(`/doctors/${doctorId}/available-slots?date=${date}`);
 }
 
+// ---------- Unavailable dates (one-off overrides) ----------
+
+export function listUnavailableDates(doctorId) {
+  return request(`/doctors/${doctorId}/unavailable-dates`);
+}
+
+export function createUnavailableDate(doctorId, data) {
+  return request(`/doctors/${doctorId}/unavailable-dates`, { method: "POST", body: data });
+}
+
+export function deleteUnavailableDate(doctorId, overrideId) {
+  return request(`/doctors/${doctorId}/unavailable-dates/${overrideId}`, { method: "DELETE" });
+}
+
 // ---------- Appointments ----------
 
 export function bookAppointment(data) {
