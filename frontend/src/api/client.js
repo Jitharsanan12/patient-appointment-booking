@@ -77,6 +77,12 @@ export function getMyDoctorProfile() {
   return request("/doctors/me");
 }
 
+// ---------- Admin ----------
+
+export function createDoctorAsAdmin(data) {
+  return request("/admin/doctors", { method: "POST", body: data });
+}
+
 // ---------- Availability ----------
 
 export function listAvailability(doctorId) {

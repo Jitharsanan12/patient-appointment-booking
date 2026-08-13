@@ -2,10 +2,10 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-// NOTE: for learning purposes, this form lets you register as patient,
-// doctor, or admin. In a real production app, only "patient" would be a
-// public self-signup option — doctor/admin accounts would be created by
-// an administrator instead.
+// Public self-signup only ever creates a patient account — there's no role
+// picker here. Doctor accounts are created by an admin (see AdminDashboard's
+// "Manage Doctors" section); the one admin account is seeded once, offline,
+// via backend/seed_admin.py.
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -14,9 +14,6 @@ export default function Register() {
     full_name: "",
     email: "",
     password: "",
-    role: "patient",
-    specialization: "",
-    bio: "",
   });
   const [error, setError] = useState("");
 
@@ -65,33 +62,6 @@ export default function Register() {
             required
           />
         </label>
-        <label>
-          I am a...
-          <select value={form.role} onChange={(e) => updateField("role", e.target.value)}>
-            <option value="patient">Patient</option>
-            <option value="doctor">Doctor</option>
-            <option value="admin">Admin</option>
-          </select>
-        </label>
-        {form.role === "doctor" && (
-          <>
-            <label>
-              Specialization
-              <input
-                value={form.specialization}
-                onChange={(e) => updateField("specialization", e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Bio (optional)
-              <input
-                value={form.bio}
-                onChange={(e) => updateField("bio", e.target.value)}
-              />
-            </label>
-          </>
-        )}
         {error && <p className="error">{error}</p>}
         <button type="submit">Register</button>
       </form>
