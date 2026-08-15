@@ -127,8 +127,29 @@ export function deleteAvailability(doctorId, availabilityId) {
   return request(`/doctors/${doctorId}/availability/${availabilityId}`, { method: "DELETE" });
 }
 
-export function getAvailableSlots(doctorId, date) {
-  return request(`/doctors/${doctorId}/available-slots?date=${date}`);
+// visitType is one of VISIT_TYPES (see below) — the backend resolves this
+// doctor's own duration for it server-side and returns only slots that
+// genuinely fit, rather than a generic fixed grid.
+export function getAvailableSlots(doctorId, date, visitType) {
+  return request(
+    `/doctors/${doctorId}/available-slots?date=${date}&visit_type=${encodeURIComponent(visitType)}`
+  );
+}
+
+// ---------- Visit types & per-doctor durations ----------
+
+// The fixed set of visit type NAMES, identical for every doctor — mirrors
+// backend app/models.py's VisitType enum. Only the duration behind each
+// name varies per doctor, which is why this is a plain constant here
+// rather than something fetched from the API.
+export const VISIT_TYPES = ["Follow-up", "Consultation", "New Patient"];
+
+export function listVisitTypeDurations(doctorId) {
+  return request(`/doctors/${doctorId}/visit-type-durations`);
+}
+
+export function updateVisitTypeDurations(doctorId, data) {
+  return request(`/doctors/${doctorId}/visit-type-durations`, { method: "PUT", body: data });
 }
 
 // ---------- Unavailable dates (one-off overrides) ----------

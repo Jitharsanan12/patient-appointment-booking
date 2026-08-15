@@ -1,6 +1,11 @@
 /*
   Lets a doctor add/edit/remove weekly availability windows, e.g.
-  "Monday, 09:00-17:00, 30-minute slots". Used inside DoctorDashboard.
+  "Monday, 09:00-17:00". Used inside DoctorDashboard.
+
+  Note: these windows only define the doctor's working HOURS. Actual
+  bookable slot length comes from the patient's selected visit type (see
+  VisitTypeDurations) — there's no per-window slot-duration setting
+  anymore, since gap-based scheduling replaced the old fixed-grid system.
 */
 
 import { useEffect, useState } from "react";
@@ -22,7 +27,7 @@ const DAY_NAMES = [
   "Sunday",
 ];
 
-const DEFAULT_FORM = { dayOfWeek: "0", startTime: "09:00", endTime: "17:00", slotDuration: 30 };
+const DEFAULT_FORM = { dayOfWeek: "0", startTime: "09:00", endTime: "17:00" };
 
 export default function AvailabilityManager({ doctorId }) {
   const [windows, setWindows] = useState([]);
@@ -53,7 +58,6 @@ export default function AvailabilityManager({ doctorId }) {
       dayOfWeek: String(w.day_of_week),
       startTime: w.start_time.slice(0, 5),
       endTime: w.end_time.slice(0, 5),
-      slotDuration: w.slot_duration_minutes,
     });
   }
 
@@ -66,11 +70,13 @@ export default function AvailabilityManager({ doctorId }) {
     e.preventDefault();
     setError("");
     // <input type="time"> gives "HH:MM"; the backend expects "HH:MM:SS".
+    // slot_duration_minutes is deliberately omitted — it's a legacy field
+    // the backend no longer uses for scheduling (see the note at the top
+    // of this file); the API defaults it to 30 on its own when omitted.
     const payload = {
       day_of_week: Number(form.dayOfWeek),
       start_time: `${form.startTime}:00`,
       end_time: `${form.endTime}:00`,
-      slot_duration_minutes: Number(form.slotDuration),
     };
     try {
       if (editingId) {
@@ -129,17 +135,6 @@ export default function AvailabilityManager({ doctorId }) {
             required
           />
         </label>
-        <label>
-          Slot length (minutes)
-          <input
-            type="number"
-            min="5"
-            step="5"
-            value={form.slotDuration}
-            onChange={(e) => updateField("slotDuration", e.target.value)}
-            required
-          />
-        </label>
         <div className="button-row">
           <button type="submit">{editingId ? "Save changes" : "Add window"}</button>
           {editingId && (
@@ -161,8 +156,7 @@ export default function AvailabilityManager({ doctorId }) {
           {windows.map((w) => (
             <li key={w.id} className={editingId === w.id ? "editing" : ""}>
               <span>
-                {DAY_NAMES[w.day_of_week]} {w.start_time.slice(0, 5)}–{w.end_time.slice(0, 5)}{" "}
-                <span className="muted">({w.slot_duration_minutes} min slots)</span>
+                {DAY_NAMES[w.day_of_week]} {w.start_time.slice(0, 5)}–{w.end_time.slice(0, 5)}
               </span>
               <div className="button-row">
                 <button type="button" onClick={() => startEditing(w)}>

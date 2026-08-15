@@ -16,6 +16,7 @@ from sqlalchemy import (
     ForeignKey,
     Enum,
     UniqueConstraint,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
@@ -34,6 +35,23 @@ class AppointmentStatus(str, enum.Enum):
     scheduled = "scheduled"
     completed = "completed"
     cancelled = "cancelled"
+
+
+class VisitType(str, enum.Enum):
+    """
+    The fixed set of visit types every doctor offers — the NAMES are the
+    same for every doctor, but each doctor sets their own duration per
+    type (see DoctorVisitTypeDuration below).
+
+    Stored as a plain string column on Appointment and
+    DoctorVisitTypeDuration (not a native Postgres enum type, unlike
+    UserRole/AppointmentStatus above) so that adding it to the EXISTING
+    appointments table is a simple ALTER TABLE ADD COLUMN, not a
+    new-enum-type migration — see the README for the exact SQL.
+    """
+    follow_up = "Follow-up"
+    consultation = "Consultation"
+    new_patient = "New Patient"
 
 
 class User(Base):
@@ -76,11 +94,41 @@ class Doctor(Base):
 
     user = relationship("User", back_populates="doctor_profile")
     appointments = relationship("Appointment", back_populates="doctor")
+    visit_type_durations = relationship(
+        "DoctorVisitTypeDuration", back_populates="doctor", cascade="all, delete-orphan"
+    )
     availability_windows = relationship(
         "Availability", back_populates="doctor", cascade="all, delete-orphan"
     )
     unavailable_dates = relationship(
         "AvailabilityOverride", back_populates="doctor", cascade="all, delete-orphan"
+    )
+
+
+class DoctorVisitTypeDuration(Base):
+    """
+    How many minutes a specific doctor takes for a specific visit type.
+    Visit type NAMES (see VisitType) are the same fixed set for every
+    doctor; only the duration is doctor-specific — e.g. Dr. A's
+    "Consultation" might be 30 minutes while Dr. B's is 45.
+
+    One row per (doctor, visit_type). A doctor who hasn't configured a
+    given type yet simply has no row for it — see
+    routers/doctors.get_visit_type_duration, which falls back to a
+    sensible default (DEFAULT_VISIT_TYPE_DURATIONS) in that case, so
+    booking still works for doctors who've never touched this setting.
+    """
+    __tablename__ = "doctor_visit_type_durations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False)
+    visit_type = Column(String, nullable=False)
+    duration_minutes = Column(Integer, nullable=False)
+
+    doctor = relationship("Doctor", back_populates="visit_type_durations")
+
+    __table_args__ = (
+        UniqueConstraint("doctor_id", "visit_type", name="uq_doctor_visit_type"),
     )
 
 
@@ -165,7 +213,14 @@ class Appointment(Base):
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False)
-    appointment_date = Column(DateTime(timezone=True), nullable=False)
+    # Deliberately NAIVE (no timezone=True) — this app is single-clinic, so
+    # every appointment_date is stored and compared as plain clinic-local
+    # wall-clock time, with no UTC conversion anywhere in the system. A
+    # doctor setting "09:00" always means "09:00" here, on the wire, and
+    # on screen — see compute_available_slots (routers/doctors.py) and
+    # validate_and_create_appointment (routers/appointments.py), which
+    # both work in naive datetimes end-to-end for the same reason.
+    appointment_date = Column(DateTime, nullable=False)
     reason = Column(String, nullable=False)
     status = Column(Enum(AppointmentStatus), nullable=False, default=AppointmentStatus.scheduled)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -180,13 +235,52 @@ class Appointment(Base):
     file_key = Column(String, nullable=True)
     file_name = Column(String, nullable=True)
 
+    # Which visit type was selected, and this doctor's duration for it AT
+    # THE TIME OF BOOKING — captured on the row itself rather than looked
+    # up live from DoctorVisitTypeDuration, so that if the doctor later
+    # edits their durations, appointments already booked keep occupying
+    # the time span they were actually booked for. compute_available_slots
+    # (see routers/doctors.py) uses appointment_date + duration_minutes to
+    # know exactly how much of the day each existing appointment blocks.
+    visit_type = Column(String, nullable=False, server_default="Consultation")
+    duration_minutes = Column(Integer, nullable=False, server_default="30")
+
     patient = relationship("User", foreign_keys=[patient_id])
     doctor = relationship("Doctor", back_populates="appointments")
 
     __table_args__ = (
-        # This is the database-level safety net against double-booking:
-        # no two rows can share the same doctor_id + appointment_date.
-        # (We'll also check this in the API code to give a friendly error
-        # message instead of a raw database error.)
-        UniqueConstraint("doctor_id", "appointment_date", name="uq_doctor_datetime"),
+        # A database-level safety net against the same doctor being
+        # double-booked at the exact same instant. With fixed-duration
+        # slots this alone used to be sufficient; now that durations vary
+        # per doctor/visit-type, two DIFFERENT start times can still
+        # overlap in real time (e.g. a 30-minute booking at 09:00 and a
+        # 20-minute booking at 09:10) — this index doesn't catch that
+        # case, so validate_and_create_appointment additionally does a
+        # real time-range overlap check in application code (see
+        # routers/appointments.py) as the primary defense; this index
+        # remains as a backstop for the exact-same-start-time race
+        # specifically.
+        #
+        # PARTIAL index — only applies WHERE status = 'scheduled'. The
+        # app's own rule (see cancel_appointment) is "a cancelled slot
+        # frees up the time", so a cancelled row must NOT permanently
+        # block that doctor+datetime from ever being booked again. A
+        # plain (non-partial) unique constraint would enforce uniqueness
+        # across ALL rows regardless of status, including cancelled
+        # ones — that was a real bug: re-booking a doctor at the exact
+        # datetime of one of their own past cancellations crashed with
+        # an unhandled IntegrityError instead of a friendly error, since
+        # application-level checks already correctly treat cancelled
+        # slots as free but the old blanket constraint didn't. Only
+        # 'scheduled' rows can ever conflict with a new booking anyway —
+        # 'completed' rows are always in the past (an appointment can't
+        # be completed before it happens), and bookings can never be in
+        # the past either, so they can never collide with a new one.
+        Index(
+            "uq_doctor_datetime_scheduled",
+            "doctor_id",
+            "appointment_date",
+            unique=True,
+            postgresql_where=(status == AppointmentStatus.scheduled),
+        ),
     )

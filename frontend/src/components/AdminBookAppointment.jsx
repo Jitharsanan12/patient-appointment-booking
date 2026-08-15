@@ -10,6 +10,7 @@ import {
   listDoctors,
   getAvailableSlots,
   adminBookAppointment,
+  VISIT_TYPES,
 } from "../api/client";
 
 function formatSlotTime(isoString) {
@@ -23,6 +24,7 @@ export default function AdminBookAppointment({ onBooked }) {
 
   const [patientId, setPatientId] = useState("");
   const [doctorId, setDoctorId] = useState("");
+  const [visitType, setVisitType] = useState("");
   const [date, setDate] = useState("");
   const [reason, setReason] = useState("");
 
@@ -45,23 +47,33 @@ export default function AdminBookAppointment({ onBooked }) {
 
   function handleDoctorChange(newDoctorId) {
     setDoctorId(newDoctorId);
+    setVisitType("");
     setDate("");
     setSlots([]);
     setSelectedSlot(null);
   }
 
-  // Same "fetch this doctor's real open slots for the chosen date" flow as
-  // the patient booking form — what's shown as pickable is always what the
-  // backend will actually accept.
+  // Changing the visit type changes how much room a slot needs, so any
+  // previously-fetched date/slots no longer mean anything.
+  function handleVisitTypeChange(newVisitType) {
+    setVisitType(newVisitType);
+    setDate("");
+    setSlots([]);
+    setSelectedSlot(null);
+  }
+
+  // Same "fetch this doctor's real open slots for the chosen date + visit
+  // type" flow as the patient booking form — what's shown as pickable is
+  // always what the backend will actually accept.
   function handleDateChange(newDate) {
     setDate(newDate);
     setSelectedSlot(null);
     setSlots([]);
-    if (!newDate || !doctorId) return;
+    if (!newDate || !doctorId || !visitType) return;
 
     setSlotsLoading(true);
     setFormError("");
-    getAvailableSlots(doctorId, newDate)
+    getAvailableSlots(doctorId, newDate, visitType)
       .then(setSlots)
       .catch((err) => setFormError(err.message))
       .finally(() => setSlotsLoading(false));
@@ -76,6 +88,10 @@ export default function AdminBookAppointment({ onBooked }) {
       setFormError("Please select a patient and a doctor.");
       return;
     }
+    if (!visitType) {
+      setFormError("Please select a visit type.");
+      return;
+    }
     if (!selectedSlot) {
       setFormError("Please select a time slot.");
       return;
@@ -88,10 +104,12 @@ export default function AdminBookAppointment({ onBooked }) {
         doctor_id: Number(doctorId),
         appointment_date: selectedSlot.start_time,
         reason,
+        visit_type: visitType,
       });
       setSuccessMessage("Appointment booked.");
       setPatientId("");
       setDoctorId("");
+      setVisitType("");
       setDate("");
       setReason("");
       setSlots([]);
@@ -136,13 +154,29 @@ export default function AdminBookAppointment({ onBooked }) {
           </select>
         </label>
         <label>
+          Visit type
+          <select
+            value={visitType}
+            onChange={(e) => handleVisitTypeChange(e.target.value)}
+            disabled={!doctorId}
+            required
+          >
+            <option value="">Select a visit type...</option>
+            {VISIT_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
           Date
           <input
             type="date"
             value={date}
             onChange={(e) => handleDateChange(e.target.value)}
             min={new Date().toISOString().slice(0, 10)}
-            disabled={!doctorId}
+            disabled={!visitType}
             required
           />
         </label>

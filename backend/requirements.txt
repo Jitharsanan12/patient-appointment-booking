@@ -10,3 +10,4 @@ python-jose[cryptography]
 resend
 boto3
 python-multipart
+pytest

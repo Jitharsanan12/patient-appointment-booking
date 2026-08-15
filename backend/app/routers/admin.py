@@ -97,7 +97,12 @@ def admin_book_appointment(
         raise HTTPException(status_code=404, detail="Patient not found")
 
     new_appointment = appointments_router.validate_and_create_appointment(
-        db, payload.patient_id, payload.doctor_id, payload.appointment_date, payload.reason
+        db,
+        payload.patient_id,
+        payload.doctor_id,
+        payload.appointment_date,
+        payload.reason,
+        payload.visit_type,
     )
     return appointments_router._to_out(new_appointment)
 

@@ -3,7 +3,7 @@ Endpoints for browsing doctors, managing a doctor's weekly availability,
 and computing actual bookable time slots for a given date.
 """
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
@@ -266,21 +266,173 @@ def delete_unavailable_date(
     return None
 
 
+# ---------- Visit types & per-doctor durations ----------
+
+# Used when a doctor hasn't set their own duration for a type yet, so
+# booking still works out of the box for every existing doctor.
+DEFAULT_VISIT_TYPE_DURATIONS = {
+    models.VisitType.follow_up: 15,
+    models.VisitType.consultation: 30,
+    models.VisitType.new_patient: 45,
+}
+
+
+def get_visit_type_duration(db: Session, doctor_id: int, visit_type: models.VisitType) -> int:
+    """
+    Minutes THIS doctor takes for the given visit type — their own
+    configured value if they've set one, otherwise the default. This is
+    the single place duration gets resolved, used by both
+    compute_available_slots below and
+    appointments.validate_and_create_appointment, so a booking is always
+    checked against the exact same duration the patient was shown.
+    """
+    row = (
+        db.query(models.DoctorVisitTypeDuration)
+        .filter(
+            models.DoctorVisitTypeDuration.doctor_id == doctor_id,
+            models.DoctorVisitTypeDuration.visit_type == visit_type.value,
+        )
+        .first()
+    )
+    return row.duration_minutes if row else DEFAULT_VISIT_TYPE_DURATIONS[visit_type]
+
+
+def _all_visit_type_durations(db: Session, doctor_id: int) -> list[schemas.VisitTypeDurationOut]:
+    """Every visit type with this doctor's effective duration, in a
+    stable order — always all three, whether or not the doctor has
+    customized any of them."""
+    return [
+        schemas.VisitTypeDurationOut(
+            visit_type=visit_type,
+            duration_minutes=get_visit_type_duration(db, doctor_id, visit_type),
+        )
+        for visit_type in models.VisitType
+    ]
+
+
+@router.get(
+    "/{doctor_id}/visit-type-durations", response_model=list[schemas.VisitTypeDurationOut]
+)
+def list_visit_type_durations(
+    doctor_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Any logged-in user can view a doctor's per-visit-type durations —
+    same reasoning as list_availability above: not sensitive, and needed
+    to understand what's actually bookable."""
+    _get_doctor_or_404(db, doctor_id)
+    return _all_visit_type_durations(db, doctor_id)
+
+
+@router.put(
+    "/{doctor_id}/visit-type-durations", response_model=list[schemas.VisitTypeDurationOut]
+)
+def update_visit_type_durations(
+    doctor_id: int,
+    payload: list[schemas.VisitTypeDurationUpdate],
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.UserRole.doctor)),
+):
+    """
+    Lets a doctor set/edit their own duration for one or more visit types
+    in a single request (upsert: creates the row the first time a type is
+    customized, updates it after that). Returns the full resolved set of
+    all three types afterward.
+    """
+    _get_doctor_or_404(db, doctor_id)
+    _require_own_doctor_profile(current_user, doctor_id, db)
+
+    for item in payload:
+        row = (
+            db.query(models.DoctorVisitTypeDuration)
+            .filter(
+                models.DoctorVisitTypeDuration.doctor_id == doctor_id,
+                models.DoctorVisitTypeDuration.visit_type == item.visit_type.value,
+            )
+            .first()
+        )
+        if row:
+            row.duration_minutes = item.duration_minutes
+        else:
+            db.add(
+                models.DoctorVisitTypeDuration(
+                    doctor_id=doctor_id,
+                    visit_type=item.visit_type.value,
+                    duration_minutes=item.duration_minutes,
+                )
+            )
+    db.commit()
+
+    return _all_visit_type_durations(db, doctor_id)
+
+
 # ---------- Computing actual bookable slots ----------
 
-def compute_available_slots(db: Session, doctor_id: int, target_date: date) -> list[dict]:
+# Granularity for stepping candidate start times through a free gap.
+# Deliberately independent of any per-doctor setting (including the
+# now-legacy Availability.slot_duration_minutes below) — see the
+# explanation on compute_available_slots.
+SLOT_STEP_MINUTES = 15
+
+
+def _free_gaps_in_window(
+    window_start: datetime, window_end: datetime, booked_intervals: list[tuple[datetime, datetime]]
+) -> list[tuple[datetime, datetime]]:
     """
-    Builds the list of bookable slots for a doctor on a specific date:
+    Subtracts every booked (start, end) interval from one working-hours
+    window, leaving the doctor's actual free gaps inside it. This is the
+    "gap-based scheduling" part: a gap is however much continuous free
+    time is genuinely left, not a fixed pre-chopped grid.
+
+    booked_intervals must already be sorted by start time.
+    """
+    gaps = []
+    cursor = window_start
+    for booked_start, booked_end in booked_intervals:
+        clipped_start = max(booked_start, window_start)
+        clipped_end = min(booked_end, window_end)
+        if clipped_start >= clipped_end:
+            continue  # this booking doesn't actually fall inside this window
+        if clipped_start > cursor:
+            gaps.append((cursor, clipped_start))
+        cursor = max(cursor, clipped_end)
+    if cursor < window_end:
+        gaps.append((cursor, window_end))
+    return gaps
+
+
+def compute_available_slots(
+    db: Session, doctor_id: int, target_date: date, duration_minutes: int
+) -> list[dict]:
+    """
+    Builds the list of bookable slots for a doctor on a specific date,
+    for a visit that takes duration_minutes, using gap-based scheduling:
+
     1. Check whether the doctor has marked target_date as a one-off
-       unavailable day (AvailabilityOverride) — if so, there are no slots
-       at all, no matter what their weekly pattern says.
-    2. Find the doctor's recurring availability windows for that day of the week.
-    3. Chop each window into slot_duration_minutes-sized pieces.
-    4. Drop any piece that's already booked (a "scheduled" appointment exists then).
-    5. Drop any piece that's already in the past.
-    Returns a list of {"start_time": datetime, "end_time": datetime} dicts,
-    sorted earliest first. This is reused by both the /available-slots
-    endpoint AND the booking endpoint (which uses it to validate requests).
+       unavailable day (AvailabilityOverride) — if so, no slots at all.
+    2. Find the doctor's recurring availability windows for that day of
+       the week — their nominal working hours.
+    3. Subtract every already-booked ("scheduled") appointment's ACTUAL
+       time range (appointment_date to appointment_date + its own
+       duration_minutes) from those windows, leaving the doctor's real
+       free gaps for the day (see _free_gaps_in_window).
+    4. Step a candidate start time through each gap in SLOT_STEP_MINUTES
+       increments, keeping a candidate only if [candidate, candidate +
+       duration_minutes] fits entirely inside that ONE gap — never
+       spanning two gaps — and isn't already in the past.
+
+    Note: Availability.slot_duration_minutes (set per availability
+    window) is NOT used here anymore — stepping granularity is now the
+    fixed SLOT_STEP_MINUTES above, and how much room a booking actually
+    needs comes from the visit type's duration instead. The field still
+    exists and is still fully editable in the availability manager (so
+    nothing there breaks), it just no longer drives slot computation.
+
+    Returns a list of {"start_time": datetime, "end_time": datetime}
+    dicts, sorted earliest first. Reused by both the /available-slots
+    endpoint and validate_and_create_appointment, which validates a
+    booking request against this exact same list.
     """
     is_blocked = (
         db.query(models.AvailabilityOverride)
@@ -307,9 +459,11 @@ def compute_available_slots(db: Session, doctor_id: int, target_date: date) -> l
     if not windows:
         return []
 
-    # Every appointment already booked for this doctor on this date, so we
-    # can skip any slot whose start time matches one of these.
-    day_start = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
+    # Every appointment already booked for this doctor on this date — its
+    # own [start, start + duration) range is what actually gets removed
+    # from the working-hours windows above. All naive clinic-local times,
+    # same as appointment_date itself — no tzinfo anywhere in this file.
+    day_start = datetime.combine(target_date, datetime.min.time())
     day_end = day_start + timedelta(days=1)
     booked_appointments = (
         db.query(models.Appointment)
@@ -319,22 +473,35 @@ def compute_available_slots(db: Session, doctor_id: int, target_date: date) -> l
             models.Appointment.appointment_date >= day_start,
             models.Appointment.appointment_date < day_end,
         )
+        .order_by(models.Appointment.appointment_date)
         .all()
     )
-    booked_start_times = {a.appointment_date for a in booked_appointments}
+    booked_intervals = [
+        (a.appointment_date, a.appointment_date + timedelta(minutes=a.duration_minutes))
+        for a in booked_appointments
+    ]
 
-    now = datetime.now(timezone.utc)
+    # datetime.now() here is deliberately naive/local (not
+    # datetime.now(timezone.utc)) — it's compared directly against the
+    # naive clinic-local appointment_date values above. This assumes the
+    # server process's own system clock is set to the clinic's timezone;
+    # if you deploy somewhere with a different system timezone, set that
+    # server's TZ (e.g. TZ=Asia/Colombo) to match the clinic.
+    now = datetime.now()
+    duration = timedelta(minutes=duration_minutes)
+    step = timedelta(minutes=SLOT_STEP_MINUTES)
     slots = []
 
     for window in windows:
-        duration = timedelta(minutes=window.slot_duration_minutes)
-        slot_start = datetime.combine(target_date, window.start_time, tzinfo=timezone.utc)
-        window_end = datetime.combine(target_date, window.end_time, tzinfo=timezone.utc)
+        window_start = datetime.combine(target_date, window.start_time)
+        window_end = datetime.combine(target_date, window.end_time)
 
-        while slot_start + duration <= window_end:
-            if slot_start not in booked_start_times and slot_start >= now:
-                slots.append({"start_time": slot_start, "end_time": slot_start + duration})
-            slot_start += duration
+        for gap_start, gap_end in _free_gaps_in_window(window_start, window_end, booked_intervals):
+            candidate = gap_start
+            while candidate + duration <= gap_end:
+                if candidate >= now:
+                    slots.append({"start_time": candidate, "end_time": candidate + duration})
+                candidate += step
 
     slots.sort(key=lambda s: s["start_time"])
     return slots
@@ -344,8 +511,10 @@ def compute_available_slots(db: Session, doctor_id: int, target_date: date) -> l
 def get_available_slots(
     doctor_id: int,
     target_date: date = Query(..., alias="date"),
+    visit_type: models.VisitType = Query(...),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
     _get_doctor_or_404(db, doctor_id)
-    return compute_available_slots(db, doctor_id, target_date)
+    duration_minutes = get_visit_type_duration(db, doctor_id, visit_type)
+    return compute_available_slots(db, doctor_id, target_date, duration_minutes)

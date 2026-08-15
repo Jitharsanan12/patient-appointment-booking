@@ -11,7 +11,7 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr, ConfigDict, Field, model_validator
 
-from app.models import UserRole, AppointmentStatus
+from app.models import UserRole, AppointmentStatus, VisitType
 
 
 # ---------- Auth / Users ----------
@@ -136,6 +136,24 @@ class SlotOut(BaseModel):
     end_time: datetime
 
 
+# ---------- Visit types & per-doctor durations ----------
+
+class VisitTypeDurationUpdate(BaseModel):
+    """One row of input for PUT /doctors/{id}/visit-type-durations — a
+    doctor setting their own duration for one visit type."""
+    visit_type: VisitType
+    duration_minutes: int = Field(gt=0)
+
+
+class VisitTypeDurationOut(BaseModel):
+    """A doctor's EFFECTIVE duration for one visit type — their own
+    configured value if they've set one, otherwise the default (see
+    DEFAULT_VISIT_TYPE_DURATIONS in routers/doctors.py). Always present
+    for all three types, whether or not the doctor has customized them."""
+    visit_type: VisitType
+    duration_minutes: int
+
+
 # ---------- Availability overrides (one-off unavailable dates) ----------
 
 class UnavailableDateCreate(BaseModel):
@@ -158,6 +176,10 @@ class AppointmentCreate(BaseModel):
     doctor_id: int
     appointment_date: datetime
     reason: str
+    # Name only — the doctor's actual duration for this type is resolved
+    # server-side (see routers.doctors.get_visit_type_duration), never
+    # sent by the client.
+    visit_type: VisitType
 
 
 class AdminBookAppointmentRequest(BaseModel):
@@ -168,6 +190,7 @@ class AdminBookAppointmentRequest(BaseModel):
     doctor_id: int
     appointment_date: datetime
     reason: str
+    visit_type: VisitType
 
 
 class AppointmentStatusUpdate(BaseModel):
@@ -183,6 +206,11 @@ class AppointmentOut(BaseModel):
     appointment_date: datetime
     reason: str
     status: AppointmentStatus
+    # The visit type selected at booking time, and this doctor's duration
+    # for it AT THAT TIME (see Appointment.duration_minutes in models.py
+    # for why this is captured on the row rather than looked up live).
+    visit_type: VisitType
+    duration_minutes: int
     # Whether a file is attached, and its original name if so — never the
     # internal S3 key, which is only used server-side (see file_key on the
     # Appointment model / app/s3_utils.py).

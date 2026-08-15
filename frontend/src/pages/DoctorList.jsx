@@ -12,6 +12,7 @@ import {
   uploadAttachment,
   ALLOWED_ATTACHMENT_TYPES,
   MAX_ATTACHMENT_SIZE_BYTES,
+  VISIT_TYPES,
 } from "../api/client";
 
 function formatSlotTime(isoString) {
@@ -25,6 +26,7 @@ export default function DoctorList() {
 
   // Which doctor's booking form is currently open (null = none).
   const [bookingDoctorId, setBookingDoctorId] = useState(null);
+  const [visitType, setVisitType] = useState("");
   const [date, setDate] = useState("");
   const [reason, setReason] = useState("");
 
@@ -54,6 +56,7 @@ export default function DoctorList() {
 
   function openBookingForm(doctorId) {
     setBookingDoctorId(doctorId);
+    setVisitType("");
     setDate("");
     setReason("");
     setSlots([]);
@@ -61,6 +64,16 @@ export default function DoctorList() {
     setFile(null);
     setFormError("");
     setSuccessMessage("");
+  }
+
+  // Changing the visit type changes how much room a slot needs, so any
+  // previously-fetched date/slots no longer mean anything — same as
+  // picking a new doctor, the patient re-picks a date under the new type.
+  function handleVisitTypeChange(newVisitType) {
+    setVisitType(newVisitType);
+    setDate("");
+    setSlots([]);
+    setSelectedSlot(null);
   }
 
   function handleFileChange(e) {
@@ -86,7 +99,9 @@ export default function DoctorList() {
   }
 
   // Whenever the chosen date changes, fetch that doctor's actual open
-  // slots for it — this is the list the patient can pick from.
+  // slots for the selected visit type on that date — this is the list
+  // the patient can pick from. The backend resolves this doctor's own
+  // duration for the type and returns only slots that genuinely fit.
   function handleDateChange(doctorId, newDate) {
     setDate(newDate);
     setSelectedSlot(null);
@@ -95,7 +110,7 @@ export default function DoctorList() {
 
     setSlotsLoading(true);
     setFormError("");
-    getAvailableSlots(doctorId, newDate)
+    getAvailableSlots(doctorId, newDate, visitType)
       .then(setSlots)
       .catch((err) => setFormError(err.message))
       .finally(() => setSlotsLoading(false));
@@ -104,6 +119,10 @@ export default function DoctorList() {
   async function handleBook(e, doctorId) {
     e.preventDefault();
     setFormError("");
+    if (!visitType) {
+      setFormError("Please select a visit type.");
+      return;
+    }
     if (!selectedSlot) {
       setFormError("Please select a time slot.");
       return;
@@ -115,6 +134,7 @@ export default function DoctorList() {
         doctor_id: doctorId,
         appointment_date: selectedSlot.start_time,
         reason,
+        visit_type: visitType,
       });
 
       // Booking is already done at this point — an upload failure below
@@ -208,12 +228,28 @@ export default function DoctorList() {
               {bookingDoctorId === doctor.id ? (
                 <form onSubmit={(e) => handleBook(e, doctor.id)}>
                   <label>
+                    Visit type
+                    <select
+                      value={visitType}
+                      onChange={(e) => handleVisitTypeChange(e.target.value)}
+                      required
+                    >
+                      <option value="">Select a visit type...</option>
+                      {VISIT_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
                     Date
                     <input
                       type="date"
                       value={date}
                       onChange={(e) => handleDateChange(doctor.id, e.target.value)}
                       min={new Date().toISOString().slice(0, 10)}
+                      disabled={!visitType}
                       required
                     />
                   </label>

@@ -13,6 +13,7 @@ import {
 } from "../api/client";
 import AvailabilityManager from "../components/AvailabilityManager";
 import UnavailableDatesManager from "../components/UnavailableDatesManager";
+import VisitTypeDurations from "../components/VisitTypeDurations";
 
 // Medical profile fields to show, in display order — paired with the raw
 // field name so a missing value can fall back to "Not provided".
@@ -104,6 +105,7 @@ export default function DoctorDashboard() {
       {doctorId && (
         <>
           <AvailabilityManager doctorId={doctorId} />
+          <VisitTypeDurations doctorId={doctorId} />
           <UnavailableDatesManager doctorId={doctorId} />
         </>
       )}

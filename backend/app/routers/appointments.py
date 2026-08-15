@@ -10,14 +10,14 @@ Access rules enforced here:
 """
 
 import io
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session, joinedload
 
 from app import models, schemas, auth, s3_utils, email_utils
 from app.database import get_db
-from app.routers.doctors import compute_available_slots
+from app.routers.doctors import compute_available_slots, get_visit_type_duration
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -38,6 +38,8 @@ def _to_out(appointment: models.Appointment) -> schemas.AppointmentOut:
         appointment_date=appointment.appointment_date,
         reason=appointment.reason,
         status=appointment.status,
+        visit_type=appointment.visit_type,
+        duration_minutes=appointment.duration_minutes,
         has_attachment=appointment.file_key is not None,
         file_name=appointment.file_name,
     )
@@ -52,7 +54,12 @@ def _with_relations(query):
 
 
 def validate_and_create_appointment(
-    db: Session, patient_id: int, doctor_id: int, appointment_date: datetime, reason: str
+    db: Session,
+    patient_id: int,
+    doctor_id: int,
+    appointment_date: datetime,
+    reason: str,
+    visit_type: models.VisitType,
 ) -> models.Appointment:
     """
     Core booking logic, shared by every path that can create an
@@ -66,25 +73,38 @@ def validate_and_create_appointment(
     the logged-in user for a normal booking, an admin-selected patient
     for an admin one.
     """
-    # If the client sent a date with no timezone info, treat it as UTC so we
-    # can safely compare it to "now" below.
-    if appointment_date.tzinfo is None:
-        appointment_date = appointment_date.replace(tzinfo=timezone.utc)
+    # appointment_date is treated as naive clinic-local wall-clock time
+    # throughout this app (see Appointment.appointment_date in models.py)
+    # — no UTC conversion anywhere. If a client happens to send a
+    # timezone-aware value anyway, we don't convert it (that would
+    # reintroduce the exact bug this design avoids) — we just discard the
+    # offset and take the numbers as literal clinic-local time.
+    if appointment_date.tzinfo is not None:
+        appointment_date = appointment_date.replace(tzinfo=None)
 
-    # Rule: no booking in the past.
-    if appointment_date < datetime.now(timezone.utc):
+    # Rule: no booking in the past. datetime.now() here is deliberately
+    # naive/local, matching appointment_date — see the note in
+    # compute_available_slots (routers/doctors.py) about this assuming
+    # the server's system clock is set to the clinic's timezone.
+    if appointment_date < datetime.now():
         raise HTTPException(status_code=400, detail="Cannot book an appointment in the past")
 
     doctor = db.query(models.Doctor).filter(models.Doctor.id == doctor_id).first()
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
 
-    # Rule: the requested time must be one of the doctor's actual bookable
-    # slots (derived from their availability windows, minus anything already
-    # booked). This reuses the exact same logic that powers the
-    # /doctors/{id}/available-slots endpoint the frontend calls, so what the
-    # patient sees as "available" is always what the backend will accept.
-    available_slots = compute_available_slots(db, doctor_id, appointment_date.date())
+    # This doctor's own duration for the requested visit type — the
+    # single source of truth also used by GET /doctors/{id}/available-slots,
+    # so what the patient was shown is exactly what gets validated here.
+    duration_minutes = get_visit_type_duration(db, doctor_id, visit_type)
+
+    # Rule: the requested [start, start + duration] range must fit inside
+    # one of the doctor's actual free gaps (working hours minus anything
+    # already booked — see compute_available_slots' gap-based scheduling).
+    # This reuses the exact same computation that powers the
+    # /doctors/{id}/available-slots endpoint the frontend calls, so what
+    # the patient sees as available is always what the backend will accept.
+    available_slots = compute_available_slots(db, doctor_id, appointment_date.date(), duration_minutes)
     if not any(slot["start_time"] == appointment_date for slot in available_slots):
         raise HTTPException(
             status_code=400,
@@ -92,29 +112,48 @@ def validate_and_create_appointment(
             "Please choose one of the doctor's open slots.",
         )
 
-    # Rule: no double-booking the same doctor at the same date/time.
-    # (Only counts appointments that are still "scheduled" — a cancelled
-    # slot frees up the time.)
-    conflict = (
+    # Rule: no double-booking — the new [start, end) range must not
+    # overlap any other SCHEDULED appointment for this doctor that day.
+    # compute_available_slots already excludes any candidate that would
+    # overlap an existing appointment, so this can only fire in a genuine
+    # race between two concurrent bookings — kept as a safety net.
+    #
+    # This is a real time-RANGE overlap check now, not an exact start-time
+    # match: with variable durations, two appointments with DIFFERENT
+    # start times can still overlap (e.g. a 30-minute booking at 09:00
+    # and a 20-minute booking at 09:10), which an exact-match check would
+    # miss. The UniqueConstraint on the appointments table still catches
+    # the exact-same-start-time case at the database level; this check
+    # generalizes it to any overlap.
+    new_end = appointment_date + timedelta(minutes=duration_minutes)
+    day_start = datetime.combine(appointment_date.date(), datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+    same_day_appointments = (
         db.query(models.Appointment)
         .filter(
             models.Appointment.doctor_id == doctor_id,
-            models.Appointment.appointment_date == appointment_date,
             models.Appointment.status == models.AppointmentStatus.scheduled,
+            models.Appointment.appointment_date >= day_start,
+            models.Appointment.appointment_date < day_end,
         )
-        .first()
+        .all()
     )
-    if conflict:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="This doctor is already booked at that date and time",
-        )
+    for existing in same_day_appointments:
+        existing_start = existing.appointment_date
+        existing_end = existing_start + timedelta(minutes=existing.duration_minutes)
+        if appointment_date < existing_end and existing_start < new_end:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This doctor is already booked at that date and time",
+            )
 
     new_appointment = models.Appointment(
         patient_id=patient_id,
         doctor_id=doctor_id,
         appointment_date=appointment_date,
         reason=reason,
+        visit_type=visit_type.value,
+        duration_minutes=duration_minutes,
         status=models.AppointmentStatus.scheduled,
     )
     db.add(new_appointment)
@@ -146,7 +185,12 @@ def book_appointment(
     current_user: models.User = Depends(auth.require_role(models.UserRole.patient)),
 ):
     new_appointment = validate_and_create_appointment(
-        db, current_user.id, payload.doctor_id, payload.appointment_date, payload.reason
+        db,
+        current_user.id,
+        payload.doctor_id,
+        payload.appointment_date,
+        payload.reason,
+        payload.visit_type,
     )
     return _to_out(new_appointment)
 
@@ -161,7 +205,7 @@ def my_upcoming_appointments(
         db.query(models.Appointment).filter(
             models.Appointment.patient_id == current_user.id,
             models.Appointment.status == models.AppointmentStatus.scheduled,
-            models.Appointment.appointment_date >= datetime.now(timezone.utc),
+            models.Appointment.appointment_date >= datetime.now(),
         )
     ).order_by(models.Appointment.appointment_date.asc())
 
