@@ -55,6 +55,11 @@ class User(Base):
     # uselist=False makes this a one-to-one relationship instead of a list.
     doctor_profile = relationship("Doctor", back_populates="user", uselist=False)
 
+    # If this user is a patient, this links to their optional medical
+    # profile (allergies, emergency contact, etc.) — same one-to-one
+    # pattern as doctor_profile above.
+    patient_profile = relationship("PatientProfile", back_populates="user", uselist=False)
+
 
 class Doctor(Base):
     """
@@ -77,6 +82,31 @@ class Doctor(Base):
     unavailable_dates = relationship(
         "AvailabilityOverride", back_populates="doctor", cascade="all, delete-orphan"
     )
+
+
+class PatientProfile(Base):
+    """
+    Optional medical profile for a user with role="patient" — allergies,
+    existing conditions, emergency contact, etc. Kept separate from User
+    (same reasoning as Doctor above) so these patient-only columns don't
+    sit on every doctor/admin row too.
+
+    Every field is nullable: a patient may never fill any of this in, and
+    that's fine — the row still exists (created on first view/edit, see
+    routers/patients.py) with everything blank.
+    """
+    __tablename__ = "patient_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    date_of_birth = Column(Date, nullable=True)
+    phone_number = Column(String, nullable=True)
+    allergies = Column(String, nullable=True)
+    existing_conditions = Column(String, nullable=True)
+    emergency_contact_name = Column(String, nullable=True)
+    emergency_contact_phone = Column(String, nullable=True)
+
+    user = relationship("User", back_populates="patient_profile")
 
 
 class Availability(Base):
@@ -139,6 +169,16 @@ class Appointment(Base):
     reason = Column(String, nullable=False)
     status = Column(Enum(AppointmentStatus), nullable=False, default=AppointmentStatus.scheduled)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    # Optional attachment (e.g. a lab report or photo) the patient can add.
+    # file_key is the object's path *inside* the private S3 bucket, NOT a
+    # public URL — the bucket has no public read access, so this key is
+    # only ever used server-side to generate a short-lived presigned
+    # download link (see app/s3_utils.py). file_name is the original
+    # filename, kept separately so the UI can show/download it with a
+    # human-readable name instead of the internal key.
+    file_key = Column(String, nullable=True)
+    file_name = Column(String, nullable=True)
 
     patient = relationship("User", foreign_keys=[patient_id])
     doctor = relationship("Doctor", back_populates="appointments")

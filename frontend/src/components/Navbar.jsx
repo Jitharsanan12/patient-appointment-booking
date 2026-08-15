@@ -26,6 +26,7 @@ export default function Navbar() {
           <>
             <Link to="/">Doctors</Link>
             <Link to="/my-appointments">My Appointments</Link>
+            <Link to="/my-profile">My Profile</Link>
           </>
         )}
         {user?.role === "doctor" && <Link to="/doctor">My Schedule</Link>}
@@ -35,6 +36,7 @@ export default function Navbar() {
             <span className="navbar-user">
               {user.full_name} ({user.role})
             </span>
+            <Link to="/change-password">Change Password</Link>
             <button onClick={handleLogout}>Logout</button>
           </>
         )}

@@ -142,3 +142,15 @@ The public Register page only ever creates a **patient** account — there's no 
 
 - **Schema changes:** tables are created with `Base.metadata.create_all()` on startup, which is fine for development. If you change `models.py` after tables already exist, you'll need a migration tool like [Alembic](https://alembic.sqlalchemy.org/) to apply the change, or drop and recreate the tables in development.
 - **Deploying to AWS** (a later goal for this project) is a separate step not covered here — it would typically involve containerizing the backend (e.g. deploy to ECS/Elastic Beanstalk), serving the frontend as a static build (e.g. S3 + CloudFront), and setting `DATABASE_URL`/`VITE_API_URL` as environment variables in that environment rather than `.env` files.
+
+## Known limitations
+
+- **Resend sandbox restriction — affects every email the app sends, not just doctor welcome emails.** All outgoing email (the doctor welcome email when an admin creates a doctor account, *and* the appointment-cancellation notifications — "your appointment was cancelled" to the patient, "this slot is now free" to the doctor) goes out from Resend's shared `onboarding@resend.dev` sender. Until you verify your own domain with Resend, that sender can only successfully deliver to **the single email address your Resend account was created with**. Sending to any other address fails with an error like:
+
+  > You can only send testing emails to your own email address (you@example.com). To send emails to other recipients, please verify a domain at resend.com/domains...
+
+  This is a Resend account restriction, not a bug in the app — the backend attempts the send with the correct recipient, Resend rejects it, and the failure is caught and printed to the server console (see `_send_email` in `backend/app/email_utils.py`). A failed send never blocks the action that triggered it: the appointment still gets cancelled (or the doctor account still gets created) either way — check the server logs for a line starting with `Failed to send email to ...` to confirm a send was attempted and see exactly why it didn't go through.
+
+  **What this means for testing:** to actually see a cancellation (or welcome) email land in an inbox, the *recipient* — the patient being notified, or the doctor — needs to be a test account registered with the same email address you signed up to Resend with, or you can use Resend's special test address `delivered@resend.dev` (always reports success, delivers nowhere real). Testing with any other real address will always fail to deliver; that's expected, not broken.
+
+  To send to real, arbitrary addresses, verify your own domain in the Resend dashboard and update `FROM_EMAIL` in `backend/app/email_utils.py` to an address on that domain.

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas, auth
 from app.database import get_db
 from app.email_utils import send_doctor_welcome_email
+from app.routers import appointments as appointments_router
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -68,3 +69,77 @@ def create_doctor(
         temporary_password=password,
         email_sent=email_sent,
     )
+
+
+@router.post(
+    "/appointments", response_model=schemas.AppointmentOut, status_code=status.HTTP_201_CREATED
+)
+def admin_book_appointment(
+    payload: schemas.AdminBookAppointmentRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.UserRole.admin)),
+):
+    """
+    Lets an admin book an appointment on behalf of an existing patient
+    (e.g. a phone booking). Runs through
+    appointments.validate_and_create_appointment — the EXACT SAME
+    past-date, real-open-slot, and double-booking checks that
+    POST /appointments (the patient's own booking endpoint) uses, so this
+    can never double-book a doctor or accept an invalid slot just because
+    it came from the admin path instead.
+    """
+    patient = (
+        db.query(models.User)
+        .filter(models.User.id == payload.patient_id, models.User.role == models.UserRole.patient)
+        .first()
+    )
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    new_appointment = appointments_router.validate_and_create_appointment(
+        db, payload.patient_id, payload.doctor_id, payload.appointment_date, payload.reason
+    )
+    return appointments_router._to_out(new_appointment)
+
+
+@router.get("/patients", response_model=list[schemas.PatientOut])
+def list_patients(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.UserRole.admin)),
+):
+    """Admin-only: every registered patient, for the admin dashboard's
+    patient directory and the booking form's patient selector."""
+    return (
+        db.query(models.User)
+        .filter(models.User.role == models.UserRole.patient)
+        .order_by(models.User.full_name.asc())
+        .all()
+    )
+
+
+@router.get("/patients/{patient_id}", response_model=list[schemas.AppointmentOut])
+def get_patient_appointment_history(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.UserRole.admin)),
+):
+    """
+    Admin-only: one patient's full appointment history (every status —
+    this is a history view, not just what's still scheduled). Reuses the
+    same _with_relations eager-loading and _to_out response conversion
+    that every other appointment-listing endpoint in appointments.py
+    already uses, instead of a new, separately-maintained query.
+    """
+    patient = (
+        db.query(models.User)
+        .filter(models.User.id == patient_id, models.User.role == models.UserRole.patient)
+        .first()
+    )
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    query = appointments_router._with_relations(
+        db.query(models.Appointment).filter(models.Appointment.patient_id == patient_id)
+    ).order_by(models.Appointment.appointment_date.desc())
+
+    return [appointments_router._to_out(a) for a in query.all()]

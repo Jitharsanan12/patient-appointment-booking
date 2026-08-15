@@ -53,3 +53,22 @@ def login(payload: schemas.LoginRequest, db: Session = Depends(get_db)):
 def get_me(current_user: models.User = Depends(auth.get_current_user)):
     """Lets the frontend ask 'who am I logged in as?' using the current token."""
     return current_user
+
+
+@router.put("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    payload: schemas.ChangePasswordRequest,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Lets any logged-in user (patient, doctor, or admin) change their own
+    password. get_current_user already identifies who is calling from
+    their token, so there's no user id in the URL or body to tamper with —
+    a user can only ever change their own password this way.
+    """
+    if not auth.verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    current_user.hashed_password = auth.hash_password(payload.new_password)
+    db.commit()

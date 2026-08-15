@@ -65,6 +65,19 @@ button:hover {
   background: #3a49d6;
 }
 
+.doctor-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.doctor-filters input[type="search"] {
+  flex: 1;
+  min-width: 200px;
+}
+
 .card-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -107,11 +120,18 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   padding: 0.5rem;
   border-radius: 6px;
   border: 1px solid #ccc;
   font-size: 1rem;
+  font-family: inherit;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 4.5rem;
 }
 
 .button-row {
@@ -166,6 +186,32 @@ select {
 button:disabled {
   background: #b7bcef;
   cursor: not-allowed;
+}
+
+/* Patient profile panel (doctor's read-only view of a patient's medical info) */
+
+.patient-profile-panel {
+  background: #f5f6fa;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.patient-profile-panel dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.patient-profile-panel dt {
+  font-size: 0.8rem;
+  color: #777;
+}
+
+.patient-profile-panel dd {
+  margin: 0;
+  font-size: 0.95rem;
 }
 
 /* Doctor availability manager */

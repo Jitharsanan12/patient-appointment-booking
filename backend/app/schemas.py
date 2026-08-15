@@ -39,6 +39,16 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PatientOut(BaseModel):
+    """Admin-only patient directory row — see GET /admin/patients."""
+    id: int
+    full_name: str
+    email: EmailStr
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -47,6 +57,13 @@ class Token(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    """Input for PUT /auth/me/password. Used by any logged-in user
+    (patient, doctor, or admin) to change their own password."""
+    current_password: str
+    new_password: str = Field(min_length=8)
 
 
 # ---------- Doctors ----------
@@ -143,6 +160,16 @@ class AppointmentCreate(BaseModel):
     reason: str
 
 
+class AdminBookAppointmentRequest(BaseModel):
+    """Input for admin-only POST /admin/appointments — same shape as
+    AppointmentCreate, plus which existing patient it's being booked for
+    (a normal booking gets that from the logged-in user instead)."""
+    patient_id: int
+    doctor_id: int
+    appointment_date: datetime
+    reason: str
+
+
 class AppointmentStatusUpdate(BaseModel):
     status: AppointmentStatus
 
@@ -156,5 +183,43 @@ class AppointmentOut(BaseModel):
     appointment_date: datetime
     reason: str
     status: AppointmentStatus
+    # Whether a file is attached, and its original name if so — never the
+    # internal S3 key, which is only used server-side (see file_key on the
+    # Appointment model / app/s3_utils.py).
+    has_attachment: bool = False
+    file_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PatientProfileUpdate(BaseModel):
+    """Input for PUT /patients/me/profile — every field optional, since a
+    patient may only want to fill in some of them."""
+    date_of_birth: Optional[date] = None
+    phone_number: Optional[str] = None
+    allergies: Optional[str] = None
+    existing_conditions: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+
+
+class PatientProfileOut(BaseModel):
+    date_of_birth: Optional[date] = None
+    phone_number: Optional[str] = None
+    allergies: Optional[str] = None
+    existing_conditions: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AttachmentDownloadOut(BaseModel):
+    """
+    A short-lived, signed S3 URL for downloading one appointment's
+    attachment (see GET /appointments/{id}/attachment), plus the original
+    filename for display. The URL itself expires a few minutes after being
+    issued — see PRESIGNED_URL_EXPIRY_SECONDS in app/s3_utils.py.
+    """
+    url: str
+    file_name: str

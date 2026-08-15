@@ -67,6 +67,13 @@ export function getMe() {
   return request("/auth/me");
 }
 
+export function changePassword(currentPassword, newPassword) {
+  return request("/auth/me/password", {
+    method: "PUT",
+    body: { current_password: currentPassword, new_password: newPassword },
+  });
+}
+
 // ---------- Doctors ----------
 
 export function listDoctors() {
@@ -81,6 +88,22 @@ export function getMyDoctorProfile() {
 
 export function createDoctorAsAdmin(data) {
   return request("/admin/doctors", { method: "POST", body: data });
+}
+
+export function adminCancelAppointment(id) {
+  return request(`/appointments/${id}/admin-cancel`, { method: "POST" });
+}
+
+export function adminBookAppointment(data) {
+  return request("/admin/appointments", { method: "POST", body: data });
+}
+
+export function listPatients() {
+  return request("/admin/patients");
+}
+
+export function getPatientAppointmentHistory(patientId) {
+  return request(`/admin/patients/${patientId}`);
 }
 
 // ---------- Availability ----------
@@ -146,4 +169,66 @@ export function updateAppointmentStatus(id, status) {
 
 export function listAllAppointments() {
   return request("/appointments");
+}
+
+// ---------- Attachments ----------
+
+// Client-side mirror of the backend's validation (see s3_utils.py), so the
+// UI can reject an obviously-bad file immediately instead of waiting on a
+// round trip — the backend still re-checks both on upload, since a client
+// check can always be bypassed.
+export const ALLOWED_ATTACHMENT_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+export const MAX_ATTACHMENT_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+// File uploads use multipart/form-data (a FormData body), not JSON, so this
+// can't go through the shared request() helper above — that always sends
+// "Content-Type: application/json" and JSON.stringifies the body. Here we
+// let the browser set Content-Type itself: it needs to add a random
+// "boundary" value that separates the file's raw bytes within the request,
+// which we have no reason to generate by hand.
+export async function uploadAttachment(appointmentId, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const headers = {};
+  const token = getToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}/appointments/${appointmentId}/attachment`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Request failed (${response.status})`);
+  }
+  return response.json();
+}
+
+// Asks the backend for a fresh, short-lived presigned S3 URL for this
+// appointment's attachment. Fetched on demand (not stored) since it
+// expires a few minutes after being issued.
+export function getAttachmentDownloadUrl(appointmentId) {
+  return request(`/appointments/${appointmentId}/attachment`);
+}
+
+// ---------- Patient profile ----------
+
+export function getMyProfile() {
+  return request("/patients/me/profile");
+}
+
+export function updateMyProfile(data) {
+  return request("/patients/me/profile", { method: "PUT", body: data });
+}
+
+// patientId is the patient's USER id (same id as appointment.patient_id).
+// Backend restricts this to a doctor who has an appointment with that
+// patient, or an admin.
+export function getPatientProfile(patientId) {
+  return request(`/patients/${patientId}/profile`);
 }
