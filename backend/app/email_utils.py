@@ -68,6 +68,33 @@ def send_doctor_welcome_email(to_email: str, full_name: str, temporary_password:
     )
 
 
+def send_booking_confirmation_email(
+    to_email: str,
+    patient_name: str,
+    doctor_name: str,
+    specialty: str,
+    appointment_time: str,
+    reason: str,
+) -> bool:
+    """
+    Confirms a newly booked appointment to the patient. Sent right after
+    booking succeeds — by both the patient's own POST /appointments and
+    the admin's POST /admin/appointments, since both go through
+    appointments.validate_and_create_appointment (see that function for
+    the single call site).
+    """
+    return _send_email(
+        to_email,
+        "Your appointment is confirmed",
+        (
+            f"<p>Hi {patient_name},</p>"
+            f"<p>Your appointment with Dr. {doctor_name} ({specialty}) is confirmed for "
+            f"<strong>{appointment_time}</strong>.</p>"
+            f"<p><strong>Reason for visit:</strong> {reason}</p>"
+        ),
+    )
+
+
 def send_appointment_cancelled_email_to_doctor(
     to_email: str, doctor_name: str, patient_name: str, appointment_time: str
 ) -> bool:

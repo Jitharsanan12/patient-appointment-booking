@@ -120,6 +120,22 @@ def validate_and_create_appointment(
     db.add(new_appointment)
     db.commit()
     db.refresh(new_appointment)
+
+    # Confirm the booking to the patient. Runs for BOTH callers of this
+    # function (the patient's own booking and an admin's booking on their
+    # behalf) since it lives here rather than in each endpoint. Same
+    # fail-soft behavior as every other email in this app — a failed send
+    # is only logged (see email_utils._send_email) and never turns a
+    # successful booking into a failed request.
+    email_utils.send_booking_confirmation_email(
+        to_email=new_appointment.patient.email,
+        patient_name=new_appointment.patient.full_name,
+        doctor_name=doctor.user.full_name,
+        specialty=doctor.specialization,
+        appointment_time=_format_appointment_time(new_appointment.appointment_date),
+        reason=new_appointment.reason,
+    )
+
     return new_appointment
 
 
