@@ -1,0 +1,232 @@
+/*
+  Booking view styling — shown in place of the doctors grid once a patient
+  picks a doctor (see DoctorList.jsx). Extends the same design system as
+  AuthPages.css / DoctorList.css: same palette, font, card/shadow
+  language, and button style — no new tokens introduced here.
+
+  Scoped under "booking-" prefixed classes so nothing here affects the
+  doctors grid view or any other page. The slot-picker buttons here are
+  intentionally NOT the same classes as the existing global .slot-button
+  (used by the separate admin booking form) — this redesign is scoped to
+  the patient booking flow only.
+*/
+
+.booking-view {
+  max-width: 640px;
+  margin: 0 auto;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.booking-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.booking-back-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 1px solid #c6c6cd;
+  border-radius: 9999px;
+  background: #ffffff;
+  color: #0b1c30;
+  cursor: pointer;
+  transition: background-color 200ms, border-color 200ms;
+  margin-top: 2px;
+}
+
+.booking-back-button:hover {
+  background: #f8f9ff;
+  border-color: #6bd8cb;
+}
+
+.booking-heading {
+  margin: 0;
+  font-size: 24px;
+  line-height: 32px;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: #000000;
+}
+
+.booking-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: #45464d;
+}
+
+/* ---------- Doctor summary card ---------- */
+
+.booking-doctor-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #ffffff;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.75rem;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.booking-doctor-card .doctor-avatar {
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.booking-doctor-name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: #0b1c30;
+}
+
+.booking-doctor-specialty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: #45464d;
+  font-size: 14px;
+}
+
+.booking-doctor-specialty .material-symbols-outlined {
+  font-size: 18px;
+  color: #006a61;
+}
+
+/* ---------- Shared field styling ---------- */
+
+.booking-section {
+  margin-bottom: 24px;
+}
+
+.booking-label {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+  color: #45464d;
+  margin-bottom: 8px;
+}
+
+.booking-select,
+.booking-date-input,
+.booking-input,
+.booking-textarea,
+.booking-file-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  color: #0b1c30;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+
+.booking-textarea {
+  resize: vertical;
+  min-height: 96px;
+  font-family: inherit;
+}
+
+.booking-textarea::placeholder {
+  color: #76777d;
+}
+
+.booking-select:focus,
+.booking-date-input:focus,
+.booking-textarea:focus {
+  outline: none;
+  border-color: #6bd8cb;
+  box-shadow: 0 0 0 1px #6bd8cb;
+}
+
+/* ---------- Date & Time card ---------- */
+
+.booking-datetime-card {
+  background: #ffffff;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.75rem;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.booking-datetime-card .booking-section:last-child {
+  margin-bottom: 0;
+}
+
+.booking-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.booking-slot-button {
+  padding: 8px 4px;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.375rem;
+  background: #ffffff;
+  color: #0b1c30;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 200ms, border-color 200ms, color 200ms;
+}
+
+.booking-slot-button:hover {
+  border-color: #6bd8cb;
+}
+
+.booking-slot-button.booking-slot-selected {
+  background: #006a61;
+  border-color: #006a61;
+  color: #ffffff;
+}
+
+.booking-slot-button.booking-slot-selected:hover {
+  border-color: #006a61;
+}
+
+/* ---------- Submit ---------- */
+
+.booking-submit-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 12px 16px;
+  background: #000000;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 200ms;
+}
+
+.booking-submit-button:hover:not(:disabled) {
+  background: #131b2e;
+}
+
+.booking-submit-button:disabled {
+  background: #c6c6cd;
+  cursor: not-allowed;
+}

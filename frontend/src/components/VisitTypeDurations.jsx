@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { VISIT_TYPES, listVisitTypeDurations, updateVisitTypeDurations } from "../api/client";
+import "../pages/DoctorDashboard.css";
 
 export default function VisitTypeDurations({ doctorId }) {
   // { "Follow-up": 15, "Consultation": 30, "New Patient": 45 }
@@ -61,17 +62,21 @@ export default function VisitTypeDurations({ doctorId }) {
   if (loading) return <p>Loading visit type durations...</p>;
 
   return (
-    <div className="card availability-manager">
-      <h3>Visit Type Durations</h3>
-      <p className="muted">
+    <div className="dashboard-card">
+      <h3 className="dashboard-card-title">Visit Type Durations</h3>
+      <p className="dashboard-card-subtitle">
         How long each visit type takes you specifically — patients pick a type by name, and only
         see time slots with enough room for it.
       </p>
-      <form onSubmit={handleSubmit} className="availability-form">
+      <form onSubmit={handleSubmit} className="dashboard-form">
         {VISIT_TYPES.map((visitType) => (
-          <label key={visitType}>
-            {visitType} (minutes)
+          <div className="dashboard-field" key={visitType}>
+            <label className="dashboard-label" htmlFor={`duration-${visitType}`}>
+              {visitType} (mins)
+            </label>
             <input
+              id={`duration-${visitType}`}
+              className="dashboard-input"
               type="number"
               min="5"
               step="5"
@@ -79,13 +84,11 @@ export default function VisitTypeDurations({ doctorId }) {
               onChange={(e) => updateField(visitType, e.target.value)}
               required
             />
-          </label>
+          </div>
         ))}
-        <div className="button-row">
-          <button type="submit" disabled={saving}>
-            {saving ? "Saving..." : "Save durations"}
-          </button>
-        </div>
+        <button type="submit" className="dashboard-button" disabled={saving}>
+          {saving ? "Saving..." : "Save durations"}
+        </button>
       </form>
       {error && <p className="error">{error}</p>}
       {success && <p className="success">{success}</p>}

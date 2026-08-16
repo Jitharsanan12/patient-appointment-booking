@@ -4,6 +4,8 @@
 
 import { useEffect, useState } from "react";
 import { myUpcomingAppointments, cancelAppointment, getAttachmentDownloadUrl } from "../api/client";
+import "./AuthPages.css";
+import "./MyAppointments.css";
 
 export default function MyAppointments() {
   const [appointments, setAppointments] = useState([]);
@@ -53,34 +55,72 @@ export default function MyAppointments() {
   if (loading) return <p>Loading appointments...</p>;
 
   return (
-    <div>
-      <h2>My Upcoming Appointments</h2>
+    <div className="appointments-page">
+      <h1 className="appointments-heading">My Appointments</h1>
       {error && <p className="error">{error}</p>}
-      {appointments.length === 0 && <p>You have no upcoming appointments.</p>}
-      <div className="card-list">
-        {appointments.map((appt) => (
-          <div className="card" key={appt.id}>
-            <h3>{appt.doctor_name}</h3>
-            <p>{new Date(appt.appointment_date).toLocaleString()}</p>
-            <p className="muted">{appt.reason}</p>
-            <p>
-              Status: <span className={`status status-${appt.status}`}>{appt.status}</span>
-            </p>
-            <div className="button-row">
+
+      {appointments.length === 0 ? (
+        <div className="appointments-empty">
+          <span className="material-symbols-outlined" aria-hidden="true">
+            calendar_month
+          </span>
+          <p>You don't have any appointments yet.</p>
+        </div>
+      ) : (
+        <div className="appointments-grid">
+          {appointments.map((appt) => (
+            <div className="appointment-card" key={appt.id}>
+              <div className="appointment-card-header">
+                <div className="appointment-doctor">
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    calendar_month
+                  </span>
+                  <p className="appointment-doctor-name">{appt.doctor_name}</p>
+                </div>
+                <span className={`appointment-badge appointment-badge--${appt.status}`}>
+                  {appt.status}
+                </span>
+              </div>
+
+              <div className="appointment-field">
+                <span className="appointment-field-label">Date &amp; Time</span>
+                <p className="appointment-field-value">
+                  {new Date(appt.appointment_date).toLocaleString()}
+                </p>
+              </div>
+
+              <div className="appointment-field">
+                <span className="appointment-field-label">Reason</span>
+                <p className="appointment-field-value">{appt.reason}</p>
+              </div>
+
               {appt.has_attachment && (
                 <button
                   type="button"
+                  className="appointment-attachment-link"
                   onClick={() => handleDownload(appt.id)}
                   disabled={downloadingId === appt.id}
                 >
-                  {downloadingId === appt.id ? "Preparing..." : "Download attachment"}
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    attach_file
+                  </span>
+                  {downloadingId === appt.id ? "Preparing..." : "View attachment"}
                 </button>
               )}
-              <button onClick={() => handleCancel(appt.id)}>Cancel</button>
+
+              {appt.status === "scheduled" && (
+                <button
+                  type="button"
+                  className="appointment-cancel-button"
+                  onClick={() => handleCancel(appt.id)}
+                >
+                  Cancel Appointment
+                </button>
+              )}
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -14,9 +14,36 @@ import {
   MAX_ATTACHMENT_SIZE_BYTES,
   VISIT_TYPES,
 } from "../api/client";
+import "./AuthPages.css";
+import "./DoctorList.css";
+import "./BookingForm.css";
 
 function formatSlotTime(isoString) {
   return new Date(isoString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// Presentation-only helpers for the new card design — derive an avatar
+// from data we already have (name/id), since we don't store doctor photos.
+function getInitials(fullName) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// Soft background + matching readable text color, picked deterministically
+// per doctor (by id) so the same doctor always gets the same color.
+const AVATAR_PALETTE = [
+  { bg: "#dbeafe", text: "#1e40af" },
+  { bg: "#dcfce7", text: "#166534" },
+  { bg: "#fce7f3", text: "#9d174d" },
+  { bg: "#fef3c7", text: "#92400e" },
+  { bg: "#e0e7ff", text: "#3730a3" },
+  { bg: "#ccfbf1", text: "#115e59" },
+];
+
+function getAvatarColors(doctorId) {
+  return AVATAR_PALETTE[doctorId % AVATAR_PALETTE.length];
 }
 
 export default function DoctorList() {
@@ -183,20 +210,189 @@ export default function DoctorList() {
     setSpecialtyFilter("");
   }
 
+  // A doctor is being booked — show the full-page booking view instead of
+  // the grid. Same route, same component, just a different conditional
+  // render branch; closing this (the back arrow) is exactly the same
+  // "clear bookingDoctorId" action the old inline Cancel button did.
+  const bookingDoctor = bookingDoctorId ? doctors.find((d) => d.id === bookingDoctorId) : null;
+
+  if (bookingDoctor) {
+    const avatarColors = getAvatarColors(bookingDoctor.id);
+    return (
+      <div className="booking-view">
+        <div className="booking-header">
+          <button
+            type="button"
+            className="booking-back-button"
+            onClick={() => setBookingDoctorId(null)}
+            aria-label="Back to doctors list"
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              arrow_back
+            </span>
+          </button>
+          <div>
+            <h1 className="booking-heading">Book Appointment</h1>
+            <p className="booking-subtitle">Select a time and provide details for your visit.</p>
+          </div>
+        </div>
+
+        <div className="booking-doctor-card">
+          <div
+            className="doctor-avatar"
+            style={{ background: avatarColors.bg, color: avatarColors.text }}
+          >
+            {getInitials(bookingDoctor.full_name)}
+          </div>
+          <div>
+            <p className="booking-doctor-name">{bookingDoctor.full_name}</p>
+            <div className="booking-doctor-specialty">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                medical_services
+              </span>
+              {bookingDoctor.specialization}
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={(e) => handleBook(e, bookingDoctor.id)}>
+          <div className="booking-section">
+            <label className="booking-label" htmlFor="visit-type">
+              Visit Type
+            </label>
+            <select
+              id="visit-type"
+              className="booking-select"
+              value={visitType}
+              onChange={(e) => handleVisitTypeChange(e.target.value)}
+              required
+            >
+              <option value="">Select a visit type...</option>
+              {VISIT_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="booking-datetime-card">
+            <div className="booking-section">
+              <label className="booking-label" htmlFor="booking-date">
+                Date &amp; Time
+              </label>
+              <input
+                id="booking-date"
+                className="booking-date-input"
+                type="date"
+                value={date}
+                onChange={(e) => handleDateChange(bookingDoctor.id, e.target.value)}
+                min={new Date().toISOString().slice(0, 10)}
+                disabled={!visitType}
+                required
+              />
+            </div>
+
+            {date && (
+              <div className="booking-section">
+                <label className="booking-label">Available Times</label>
+                {slotsLoading ? (
+                  <p className="muted">Loading slots...</p>
+                ) : slots.length === 0 ? (
+                  <p className="muted">No open slots on this date. Try another date.</p>
+                ) : (
+                  <div className="booking-slot-grid">
+                    {slots.map((slot) => (
+                      <button
+                        type="button"
+                        key={slot.start_time}
+                        className={
+                          "booking-slot-button" +
+                          (selectedSlot?.start_time === slot.start_time
+                            ? " booking-slot-selected"
+                            : "")
+                        }
+                        onClick={() => setSelectedSlot(slot)}
+                      >
+                        {formatSlotTime(slot.start_time)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="booking-section">
+            <label className="booking-label" htmlFor="booking-reason">
+              Reason for visit
+            </label>
+            <textarea
+              id="booking-reason"
+              className="booking-textarea"
+              placeholder="Briefly describe your symptoms or reason for the appointment..."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="booking-section">
+            <label className="booking-label" htmlFor="booking-file">
+              Attach a file (optional) — PDF, JPG, or PNG, max 5MB
+            </label>
+            <input
+              id="booking-file"
+              className="booking-file-input"
+              type="file"
+              accept="application/pdf,image/jpeg,image/png"
+              onChange={handleFileChange}
+            />
+            {file && <p className="muted">Selected: {file.name}</p>}
+          </div>
+
+          {formError && <p className="error">{formError}</p>}
+
+          <button
+            type="submit"
+            className="booking-submit-button"
+            disabled={!selectedSlot || submitting}
+          >
+            {submitting ? "Booking..." : "Book Appointment"}
+            <span className="material-symbols-outlined" aria-hidden="true">
+              arrow_forward
+            </span>
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <h2>Doctors</h2>
+    <div className="doctors-page">
+      <h1 className="doctors-heading">Find Your Doctor</h1>
+      <p className="doctors-subtitle">
+        Book an appointment with our trusted healthcare professionals.
+      </p>
+
       {successMessage && <p className="success">{successMessage}</p>}
 
-      <div className="doctor-filters">
-        <input
-          type="search"
-          placeholder="Search by doctor name..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          aria-label="Search doctors by name"
-        />
+      <div className="doctors-toolbar">
+        <div className="doctors-search-wrap">
+          <span className="material-symbols-outlined doctors-search-icon" aria-hidden="true">
+            search
+          </span>
+          <input
+            className="doctors-search-input"
+            type="search"
+            placeholder="Search by name or keyword..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search doctors by name"
+          />
+        </div>
         <select
+          className="doctors-specialty-select"
           value={specialtyFilter}
           onChange={(e) => setSpecialtyFilter(e.target.value)}
           aria-label="Filter by specialty"
@@ -209,7 +405,7 @@ export default function DoctorList() {
           ))}
         </select>
         {filtersActive && (
-          <button type="button" onClick={handleClearFilters}>
+          <button type="button" className="doctors-clear-button" onClick={handleClearFilters}>
             Clear filters
           </button>
         )}
@@ -218,107 +414,39 @@ export default function DoctorList() {
       {filteredDoctors.length === 0 ? (
         <p className="muted">No doctors found.</p>
       ) : (
-        <div className="card-list">
-          {filteredDoctors.map((doctor) => (
-            <div className="card" key={doctor.id}>
-              <h3>{doctor.full_name}</h3>
-              <p>{doctor.specialization}</p>
-              {doctor.bio && <p className="muted">{doctor.bio}</p>}
-
-              {bookingDoctorId === doctor.id ? (
-                <form onSubmit={(e) => handleBook(e, doctor.id)}>
-                  <label>
-                    Visit type
-                    <select
-                      value={visitType}
-                      onChange={(e) => handleVisitTypeChange(e.target.value)}
-                      required
-                    >
-                      <option value="">Select a visit type...</option>
-                      {VISIT_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Date
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={(e) => handleDateChange(doctor.id, e.target.value)}
-                      min={new Date().toISOString().slice(0, 10)}
-                      disabled={!visitType}
-                      required
-                    />
-                  </label>
-
-                  {date && (
-                    <div>
-                      <label>Available times</label>
-                      {slotsLoading ? (
-                        <p className="muted">Loading slots...</p>
-                      ) : slots.length === 0 ? (
-                        <p className="muted">
-                          No open slots on this date. Try another date.
-                        </p>
-                      ) : (
-                        <div className="slot-grid">
-                          {slots.map((slot) => (
-                            <button
-                              type="button"
-                              key={slot.start_time}
-                              className={
-                                "slot-button" +
-                                (selectedSlot?.start_time === slot.start_time ? " slot-selected" : "")
-                              }
-                              onClick={() => setSelectedSlot(slot)}
-                            >
-                              {formatSlotTime(slot.start_time)}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <label>
-                    Reason
-                    <input
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Attach a file (optional) — PDF, JPG, or PNG, max 5MB
-                    <input
-                      type="file"
-                      accept="application/pdf,image/jpeg,image/png"
-                      onChange={handleFileChange}
-                    />
-                  </label>
-                  {file && <p className="muted">Selected: {file.name}</p>}
-                  {formError && <p className="error">{formError}</p>}
-                  <div className="button-row">
-                    <button type="submit" disabled={!selectedSlot || submitting}>
-                      {submitting ? "Booking..." : "Confirm booking"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBookingDoctorId(null)}
-                      disabled={submitting}
-                    >
-                      Cancel
-                    </button>
+        <div className="doctors-grid">
+          {filteredDoctors.map((doctor) => {
+            const avatarColors = getAvatarColors(doctor.id);
+            return (
+              <div className="doctor-card" key={doctor.id}>
+                <div className="doctor-card-summary">
+                  <div
+                    className="doctor-avatar"
+                    style={{ background: avatarColors.bg, color: avatarColors.text }}
+                  >
+                    {getInitials(doctor.full_name)}
                   </div>
-                </form>
-              ) : (
-                <button onClick={() => openBookingForm(doctor.id)}>Book appointment</button>
-              )}
-            </div>
-          ))}
+                  <p className="doctor-name">{doctor.full_name}</p>
+                  <div className="doctor-specialty">
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      medical_services
+                    </span>
+                    {doctor.specialization}
+                  </div>
+                  <button
+                    type="button"
+                    className="doctor-book-button"
+                    onClick={() => openBookingForm(doctor.id)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      calendar_month
+                    </span>
+                    Book appointment
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

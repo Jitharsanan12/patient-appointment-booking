@@ -1,19 +1,19 @@
 /*
   Doctor page: lists appointments assigned to them, with buttons to mark
-  each one completed or cancelled.
+  each one completed or cancelled. This is the "My Schedule" page — the
+  availability/durations/block-date settings live on their own page,
+  DoctorSettings.jsx.
 */
 
 import { useEffect, useState } from "react";
 import {
   myAssignedAppointments,
   updateAppointmentStatus,
-  getMyDoctorProfile,
   getAttachmentDownloadUrl,
   getPatientProfile,
 } from "../api/client";
-import AvailabilityManager from "../components/AvailabilityManager";
-import UnavailableDatesManager from "../components/UnavailableDatesManager";
-import VisitTypeDurations from "../components/VisitTypeDurations";
+import "./AuthPages.css";
+import "./DoctorDashboard.css";
 
 // Medical profile fields to show, in display order — paired with the raw
 // field name so a missing value can fall back to "Not provided".
@@ -26,11 +26,43 @@ const PROFILE_FIELDS = [
   ["Emergency contact phone", "emergency_contact_phone"],
 ];
 
+// Pure display helpers for the "My Schedule" date navigator — these only
+// format/filter the appointments already fetched via myAssignedAppointments();
+// they never touch the API or scheduling logic.
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatDayHeader(date) {
+  const today = startOfDay(new Date());
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  let dayLabel;
+  if (date.getTime() === today.getTime()) dayLabel = "Today";
+  else if (date.getTime() === tomorrow.getTime()) dayLabel = "Tomorrow";
+  else if (date.getTime() === yesterday.getTime()) dayLabel = "Yesterday";
+  else dayLabel = date.toLocaleDateString([], { weekday: "long" });
+
+  const dateLabel = date.toLocaleDateString([], { month: "short", day: "numeric" });
+  return `${dayLabel}, ${dateLabel}`;
+}
+
+// Splits a Date into a large "09:00" value plus a small "AM"/"PM" label,
+// so the time can be styled as the card's most prominent element.
+function formatTimeParts(date) {
+  const [time, meridiem] = date
+    .toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+    .split(" ");
+  return { time, meridiem };
+}
+
 export default function DoctorDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [doctorId, setDoctorId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
 
   // Which appointment's patient-info section is currently open, and the
@@ -41,6 +73,25 @@ export default function DoctorDashboard() {
   const [profileLoadingApptId, setProfileLoadingApptId] = useState(null);
   const [profileError, setProfileError] = useState("");
 
+  // Which day the schedule list is currently showing — defaults to today.
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+
+  function goToPreviousDay() {
+    setSelectedDate((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() - 1);
+      return next;
+    });
+  }
+
+  function goToNextDay() {
+    setSelectedDate((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() + 1);
+      return next;
+    });
+  }
+
   function load() {
     setLoading(true);
     myAssignedAppointments()
@@ -50,9 +101,6 @@ export default function DoctorDashboard() {
   }
 
   useEffect(load, []);
-  useEffect(() => {
-    getMyDoctorProfile().then((profile) => setDoctorId(profile.id));
-  }, []);
 
   async function handleStatusChange(id, status) {
     setError("");
@@ -100,74 +148,153 @@ export default function DoctorDashboard() {
 
   if (loading) return <p>Loading schedule...</p>;
 
+  // Same appointments array as before — just filtered to the selected day
+  // and sorted by time for display. No refetch, no new API calls.
+  const dayAppointments = appointments
+    .filter((appt) => startOfDay(new Date(appt.appointment_date)).getTime() === selectedDate.getTime())
+    .sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date));
+
+  // Only highlight the very next upcoming appointment, and only when
+  // viewing today — never on past/future days.
+  const isViewingToday = selectedDate.getTime() === startOfDay(new Date()).getTime();
+  const now = new Date();
+  const nextAppointment = isViewingToday
+    ? dayAppointments.find((appt) => appt.status === "scheduled" && new Date(appt.appointment_date) >= now)
+    : null;
+
   return (
-    <div>
-      {doctorId && (
-        <>
-          <AvailabilityManager doctorId={doctorId} />
-          <VisitTypeDurations doctorId={doctorId} />
-          <UnavailableDatesManager doctorId={doctorId} />
-        </>
-      )}
+    <div className="dashboard-page schedule-page">
+      <div className="schedule-page-header">
+        <h2 className="dashboard-heading">My Schedule</h2>
 
-      <h2>My Schedule</h2>
-      {error && <p className="error">{error}</p>}
-      {profileError && <p className="error">{profileError}</p>}
-      {appointments.length === 0 && <p>No appointments assigned to you yet.</p>}
-      <div className="card-list">
-        {appointments.map((appt) => (
-          <div className="card" key={appt.id}>
-            <h3>{appt.patient_name}</h3>
-            <p>{new Date(appt.appointment_date).toLocaleString()}</p>
-            <p className="muted">{appt.reason}</p>
-            <p>
-              Status: <span className={`status status-${appt.status}`}>{appt.status}</span>
-            </p>
-            {appt.has_attachment && (
-              <button
-                type="button"
-                onClick={() => handleDownload(appt.id)}
-                disabled={downloadingId === appt.id}
-              >
-                {downloadingId === appt.id ? "Preparing..." : "Download attachment"}
-              </button>
-            )}
-            {appt.status === "scheduled" && (
-              <div className="button-row">
-                <button onClick={() => handleStatusChange(appt.id, "completed")}>
-                  Mark completed
-                </button>
-                <button onClick={() => handleStatusChange(appt.id, "cancelled")}>
-                  Cancel
-                </button>
-              </div>
-            )}
+        <div className="dashboard-date-nav">
+          <button
+            type="button"
+            className="dashboard-date-nav-btn"
+            onClick={goToPreviousDay}
+            aria-label="Previous day"
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              chevron_left
+            </span>
+          </button>
+          <h4 className="dashboard-date-label">{formatDayHeader(selectedDate)}</h4>
+          <button
+            type="button"
+            className="dashboard-date-nav-btn"
+            onClick={goToNextDay}
+            aria-label="Next day"
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              chevron_right
+            </span>
+          </button>
+        </div>
 
-            <button type="button" onClick={() => handleTogglePatientInfo(appt)}>
-              {expandedApptId === appt.id ? "Hide patient info" : "View patient info"}
-            </button>
-
-            {expandedApptId === appt.id && (
-              <div className="patient-profile-panel">
-                {profileLoadingApptId === appt.id ? (
-                  <p className="muted">Loading patient info...</p>
-                ) : (
-                  profilesByPatientId[appt.patient_id] && (
-                    <dl>
-                      {PROFILE_FIELDS.map(([label, field]) => (
-                        <div key={field}>
-                          <dt>{label}</dt>
-                          <dd>{profilesByPatientId[appt.patient_id][field] || "Not provided"}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  )
-                )}
-              </div>
-            )}
-          </div>
-        ))}
+        {error && <p className="error">{error}</p>}
+        {profileError && <p className="error">{profileError}</p>}
       </div>
+
+      {dayAppointments.length === 0 ? (
+        <div className="dashboard-empty">
+          <span className="material-symbols-outlined" aria-hidden="true">
+            calendar_month
+          </span>
+          <p>No appointments scheduled for this day.</p>
+        </div>
+      ) : (
+        <div className="dashboard-appointments schedule-page-appointments">
+          {dayAppointments.map((appt) => {
+            const { time, meridiem } = formatTimeParts(new Date(appt.appointment_date));
+            return (
+              <div
+                className={
+                  "dashboard-appointment-card" +
+                  (nextAppointment && nextAppointment.id === appt.id
+                    ? " dashboard-appointment-card--next"
+                    : "")
+                }
+                key={appt.id}
+              >
+                <div className="appt-time-block">
+                  <span className="appt-time-value">{time}</span>
+                  <span className="appt-time-meridiem">{meridiem}</span>
+                </div>
+
+                <div className="appt-card-body">
+                  <div className="appt-card-top">
+                    <p className="appt-patient-name">{appt.patient_name}</p>
+                    <span className="visit-type-badge">
+                      {appt.visit_type} · {appt.duration_minutes} min
+                    </span>
+                  </div>
+                  <p className="appt-reason">
+                    <span className="appt-reason-label">Reason:</span>
+                    {appt.reason}
+                  </p>
+
+                  <div className="dashboard-appointment-actions">
+                    {appt.has_attachment && (
+                      <button
+                        type="button"
+                        className="dashboard-button-secondary"
+                        onClick={() => handleDownload(appt.id)}
+                        disabled={downloadingId === appt.id}
+                      >
+                        {downloadingId === appt.id ? "Preparing..." : "Download attachment"}
+                      </button>
+                    )}
+                    {appt.status === "scheduled" && (
+                      <>
+                        <button
+                          type="button"
+                          className="dashboard-button"
+                          onClick={() => handleStatusChange(appt.id, "completed")}
+                        >
+                          Mark completed
+                        </button>
+                        <button
+                          type="button"
+                          className="dashboard-button-secondary"
+                          onClick={() => handleStatusChange(appt.id, "cancelled")}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      className="dashboard-button-secondary"
+                      onClick={() => handleTogglePatientInfo(appt)}
+                    >
+                      {expandedApptId === appt.id ? "Hide patient info" : "View patient info"}
+                    </button>
+                  </div>
+
+                  {expandedApptId === appt.id && (
+                    <div className="dashboard-patient-profile">
+                      {profileLoadingApptId === appt.id ? (
+                        <p className="muted">Loading patient info...</p>
+                      ) : (
+                        profilesByPatientId[appt.patient_id] && (
+                          <dl>
+                            {PROFILE_FIELDS.map(([label, field]) => (
+                              <div key={field}>
+                                <dt>{label}</dt>
+                                <dd>{profilesByPatientId[appt.patient_id][field] || "Not provided"}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

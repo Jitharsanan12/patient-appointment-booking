@@ -1,0 +1,195 @@
+/*
+  My Appointments (patient view) redesign. Extends the same design
+  system as AuthPages.css / DoctorList.css / BookingForm.css — same
+  palette, font, card/shadow language — no new tokens invented, except
+  the badge colors below, which are semantic extensions clearly implied
+  by the existing accent (teal) and muted-red already used elsewhere in
+  this app (e.g. the original .status-cancelled colors), not new
+  arbitrary choices.
+
+  Scoped under "appointments-"/"appointment-" prefixed classes so this
+  doesn't affect any other page. The card's real status values
+  (scheduled/completed/cancelled) drive both the badge color and whether
+  the Cancel button renders at all — see MyAppointments.jsx.
+*/
+
+.appointments-page {
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.appointments-heading {
+  margin: 0 0 24px;
+  font-size: 32px;
+  line-height: 40px;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  color: #000000;
+}
+
+.appointments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.appointment-card {
+  background: #ffffff;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.75rem;
+  padding: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 300ms, border-color 300ms;
+}
+
+.appointment-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border-color: #6bd8cb;
+}
+
+.appointment-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.appointment-doctor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.appointment-doctor .material-symbols-outlined {
+  font-size: 20px;
+  color: #006a61;
+}
+
+.appointment-doctor-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0b1c30;
+}
+
+.appointment-badge {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.appointment-badge--scheduled {
+  background: #e0f5f2;
+  color: #006a61;
+}
+
+.appointment-badge--completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.appointment-badge--cancelled {
+  background: #fde8e8;
+  color: #c22e2e;
+}
+
+.appointment-field {
+  margin-bottom: 12px;
+}
+
+.appointment-field:last-of-type {
+  margin-bottom: 16px;
+}
+
+.appointment-field-label {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+  color: #76777d;
+  margin-bottom: 2px;
+}
+
+.appointment-field-value {
+  margin: 0;
+  font-size: 14px;
+  color: #0b1c30;
+}
+
+.appointment-attachment-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 16px;
+  color: #006a61;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 200ms;
+}
+
+.appointment-attachment-link .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.appointment-attachment-link:hover:not(:disabled) {
+  color: #6bd8cb;
+}
+
+.appointment-attachment-link:disabled {
+  color: #c6c6cd;
+  cursor: default;
+}
+
+.appointment-cancel-button {
+  width: 100%;
+  background: transparent;
+  border: 1px solid #ba1a1a;
+  border-radius: 0.375rem;
+  padding: 8px 16px;
+  color: #ba1a1a;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 200ms, color 200ms;
+}
+
+.appointment-cancel-button:hover {
+  background: #ba1a1a;
+  color: #ffffff;
+}
+
+/* ---------- Empty state ---------- */
+
+.appointments-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 56px 24px;
+  background: #ffffff;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.75rem;
+}
+
+.appointments-empty .material-symbols-outlined {
+  font-size: 40px;
+  color: #c6c6cd;
+  margin-bottom: 12px;
+}
+
+.appointments-empty p {
+  margin: 0;
+  font-size: 14px;
+  color: #45464d;
+}

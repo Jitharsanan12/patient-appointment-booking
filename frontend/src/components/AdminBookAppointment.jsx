@@ -12,6 +12,8 @@ import {
   adminBookAppointment,
   VISIT_TYPES,
 } from "../api/client";
+import "../pages/DoctorDashboard.css";
+import "../pages/BookingForm.css";
 
 function formatSlotTime(isoString) {
   return new Date(isoString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -123,13 +125,23 @@ export default function AdminBookAppointment({ onBooked }) {
   }
 
   return (
-    <div className="card availability-manager">
-      <h3>Book Appointment</h3>
+    <div className="dashboard-card">
+      <h3 className="dashboard-card-title">Book Appointment</h3>
+      <p className="dashboard-card-subtitle">Book an appointment on a patient's behalf.</p>
       {loadError && <p className="error">{loadError}</p>}
+
       <form onSubmit={handleSubmit}>
-        <label>
-          Patient
-          <select value={patientId} onChange={(e) => setPatientId(e.target.value)} required>
+        <div className="booking-section">
+          <label className="booking-label" htmlFor="admin-book-patient">
+            Patient
+          </label>
+          <select
+            id="admin-book-patient"
+            className="booking-select"
+            value={patientId}
+            onChange={(e) => setPatientId(e.target.value)}
+            required
+          >
             <option value="">Select a patient...</option>
             {patients.map((patient) => (
               <option key={patient.id} value={patient.id}>
@@ -137,10 +149,15 @@ export default function AdminBookAppointment({ onBooked }) {
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          Doctor
+        </div>
+
+        <div className="booking-section">
+          <label className="booking-label" htmlFor="admin-book-doctor">
+            Doctor
+          </label>
           <select
+            id="admin-book-doctor"
+            className="booking-select"
             value={doctorId}
             onChange={(e) => handleDoctorChange(e.target.value)}
             required
@@ -152,10 +169,15 @@ export default function AdminBookAppointment({ onBooked }) {
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          Visit type
+        </div>
+
+        <div className="booking-section">
+          <label className="booking-label" htmlFor="admin-book-visit-type">
+            Visit type
+          </label>
           <select
+            id="admin-book-visit-type"
+            className="booking-select"
             value={visitType}
             onChange={(e) => handleVisitTypeChange(e.target.value)}
             disabled={!doctorId}
@@ -168,10 +190,15 @@ export default function AdminBookAppointment({ onBooked }) {
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          Date
+        </div>
+
+        <div className="booking-section">
+          <label className="booking-label" htmlFor="admin-book-date">
+            Date
+          </label>
           <input
+            id="admin-book-date"
+            className="booking-date-input"
             type="date"
             value={date}
             onChange={(e) => handleDateChange(e.target.value)}
@@ -179,24 +206,24 @@ export default function AdminBookAppointment({ onBooked }) {
             disabled={!visitType}
             required
           />
-        </label>
+        </div>
 
         {date && (
-          <div>
-            <label>Available times</label>
+          <div className="booking-section">
+            <label className="booking-label">Available times</label>
             {slotsLoading ? (
               <p className="muted">Loading slots...</p>
             ) : slots.length === 0 ? (
               <p className="muted">No open slots on this date. Try another date.</p>
             ) : (
-              <div className="slot-grid">
+              <div className="booking-slot-grid">
                 {slots.map((slot) => (
                   <button
                     type="button"
                     key={slot.start_time}
                     className={
-                      "slot-button" +
-                      (selectedSlot?.start_time === slot.start_time ? " slot-selected" : "")
+                      "booking-slot-button" +
+                      (selectedSlot?.start_time === slot.start_time ? " booking-slot-selected" : "")
                     }
                     onClick={() => setSelectedSlot(slot)}
                   >
@@ -208,15 +235,27 @@ export default function AdminBookAppointment({ onBooked }) {
           </div>
         )}
 
-        <label>
-          Reason
-          <input value={reason} onChange={(e) => setReason(e.target.value)} required />
-        </label>
+        <div className="booking-section">
+          <label className="booking-label" htmlFor="admin-book-reason">
+            Reason
+          </label>
+          <input
+            id="admin-book-reason"
+            className="booking-input"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            required
+          />
+        </div>
 
         {formError && <p className="error">{formError}</p>}
         {successMessage && <p className="success">{successMessage}</p>}
 
-        <button type="submit" disabled={!selectedSlot || submitting}>
+        <button
+          type="submit"
+          className="booking-submit-button"
+          disabled={!selectedSlot || submitting}
+        >
           {submitting ? "Booking..." : "Book appointment"}
         </button>
       </form>

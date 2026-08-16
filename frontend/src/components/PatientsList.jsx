@@ -5,6 +5,9 @@
 
 import { useEffect, useState } from "react";
 import { listPatients, getPatientAppointmentHistory } from "../api/client";
+import "../pages/DoctorDashboard.css";
+import "../pages/MyAppointments.css";
+import "../pages/AdminDashboard.css";
 
 export default function PatientsList() {
   const [patients, setPatients] = useState([]);
@@ -42,63 +45,85 @@ export default function PatientsList() {
   if (loading) return <p>Loading patients...</p>;
 
   return (
-    <div className="card availability-manager">
-      <h3>Patients</h3>
-      {error && <p className="error">{error}</p>}
-      {patients.length === 0 && <p className="muted">No patients registered yet.</p>}
-      <ul className="availability-list">
-        {patients.map((patient) => (
-          <li key={patient.id} className={selectedPatient?.id === patient.id ? "editing" : ""}>
-            <span>
-              {patient.full_name}{" "}
-              <span className="muted">
-                — {patient.email} — registered{" "}
-                {new Date(patient.created_at).toLocaleDateString()}
-              </span>
-            </span>
-            <div className="button-row">
-              <button type="button" onClick={() => handleSelectPatient(patient)}>
-                {selectedPatient?.id === patient.id ? "Hide history" : "View history"}
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+    <>
+      <div className="dashboard-card admin-section">
+        <h3 className="dashboard-card-title">Patients</h3>
+        {error && <p className="error">{error}</p>}
+
+        {patients.length === 0 ? (
+          <p className="muted">No patients registered yet.</p>
+        ) : (
+          <div className="admin-table-card">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Registered</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {patients.map((patient) => (
+                  <tr key={patient.id}>
+                    <td>{patient.full_name}</td>
+                    <td>{patient.email}</td>
+                    <td>{new Date(patient.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="dashboard-button-secondary"
+                        onClick={() => handleSelectPatient(patient)}
+                      >
+                        {selectedPatient?.id === patient.id ? "Hide history" : "View history"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {selectedPatient && (
-        <div className="patient-profile-panel">
-          <h4>{selectedPatient.full_name}'s appointment history</h4>
+        <div className="dashboard-card">
+          <h3 className="dashboard-card-title">{selectedPatient.full_name}'s appointment history</h3>
           {historyLoading && <p className="muted">Loading history...</p>}
           {historyError && <p className="error">{historyError}</p>}
           {!historyLoading && !historyError && history.length === 0 && (
             <p className="muted">No appointments yet.</p>
           )}
           {!historyLoading && history.length > 0 && (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Doctor</th>
-                  <th>Date</th>
-                  <th>Reason</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((appt) => (
-                  <tr key={appt.id}>
-                    <td>{appt.doctor_name}</td>
-                    <td>{new Date(appt.appointment_date).toLocaleString()}</td>
-                    <td>{appt.reason}</td>
-                    <td>
-                      <span className={`status status-${appt.status}`}>{appt.status}</span>
-                    </td>
+            <div className="admin-table-card">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Doctor</th>
+                    <th>Date</th>
+                    <th>Reason</th>
+                    <th>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {history.map((appt) => (
+                    <tr key={appt.id}>
+                      <td>{appt.doctor_name}</td>
+                      <td>{new Date(appt.appointment_date).toLocaleString()}</td>
+                      <td>{appt.reason}</td>
+                      <td>
+                        <span className={`appointment-badge appointment-badge--${appt.status}`}>
+                          {appt.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }

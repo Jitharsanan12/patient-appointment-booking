@@ -1,13 +1,16 @@
 /*
-  Admin page: manage doctor accounts, and a read-only view of every
-  appointment in the system.
+  Admin page: book an appointment on a patient's behalf, and a read-only,
+  cancel-capable view of every appointment in the system. Doctor
+  management and the patients list moved to their own pages/routes — see
+  AdminDoctors.jsx and AdminPatients.jsx.
 */
 
 import { useEffect, useState } from "react";
 import { listAllAppointments, adminCancelAppointment } from "../api/client";
-import ManageDoctors from "../components/ManageDoctors";
 import AdminBookAppointment from "../components/AdminBookAppointment";
-import PatientsList from "../components/PatientsList";
+import "./DoctorDashboard.css";
+import "./MyAppointments.css";
+import "./AdminDashboard.css";
 
 export default function AdminDashboard() {
   const [appointments, setAppointments] = useState([]);
@@ -45,54 +48,60 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div>
-      <ManageDoctors />
-      <AdminBookAppointment onBooked={load} />
-      <PatientsList />
+    <div className="dashboard-page">
+      <h2 className="dashboard-heading">All Appointments</h2>
 
-      <h2>All Appointments</h2>
+      <div className="admin-section">
+        <AdminBookAppointment onBooked={load} />
+      </div>
+
       {loading && <p>Loading appointments...</p>}
       {error && <p className="error">{error}</p>}
+
       {!loading && !error && (
-        <>
-          {appointments.length === 0 && <p>No appointments yet.</p>}
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Doctor</th>
-                <th>Date</th>
-                <th>Reason</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {appointments.map((appt) => (
-                <tr key={appt.id}>
-                  <td>{appt.patient_name}</td>
-                  <td>{appt.doctor_name}</td>
-                  <td>{new Date(appt.appointment_date).toLocaleString()}</td>
-                  <td>{appt.reason}</td>
-                  <td>
-                    <span className={`status status-${appt.status}`}>{appt.status}</span>
-                  </td>
-                  <td>
-                    {appt.status === "scheduled" && (
-                      <button
-                        type="button"
-                        onClick={() => handleCancel(appt)}
-                        disabled={cancellingId === appt.id}
-                      >
-                        {cancellingId === appt.id ? "Cancelling..." : "Cancel"}
-                      </button>
-                    )}
-                  </td>
+        <div className="admin-table-card">
+          {appointments.length === 0 ? (
+            <p className="admin-table-empty">No appointments yet.</p>
+          ) : (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th>Doctor</th>
+                  <th>Date &amp; Time</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
+              </thead>
+              <tbody>
+                {appointments.map((appt) => (
+                  <tr key={appt.id}>
+                    <td>{appt.patient_name}</td>
+                    <td>{appt.doctor_name}</td>
+                    <td>{new Date(appt.appointment_date).toLocaleString()}</td>
+                    <td>
+                      <span className={`appointment-badge appointment-badge--${appt.status}`}>
+                        {appt.status}
+                      </span>
+                    </td>
+                    <td>
+                      {appt.status === "scheduled" && (
+                        <button
+                          type="button"
+                          className="admin-cancel-link"
+                          onClick={() => handleCancel(appt)}
+                          disabled={cancellingId === appt.id}
+                        >
+                          {cancellingId === appt.id ? "Cancelling..." : "Cancel"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
     </div>
   );

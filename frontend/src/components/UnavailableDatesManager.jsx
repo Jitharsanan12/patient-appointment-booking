@@ -10,6 +10,8 @@ import {
   createUnavailableDate,
   deleteUnavailableDate,
 } from "../api/client";
+import "../pages/AuthPages.css";
+import "../pages/DoctorDashboard.css";
 
 export default function UnavailableDatesManager({ doctorId }) {
   const [dates, setDates] = useState([]);
@@ -53,50 +55,69 @@ export default function UnavailableDatesManager({ doctorId }) {
   }
 
   return (
-    <div className="card availability-manager">
-      <h3>Block a Date</h3>
-      <p className="muted">
+    <div className="dashboard-card">
+      <h3 className="dashboard-card-title">Block a Date</h3>
+      <p className="dashboard-card-subtitle">
         Mark a specific date as unavailable — e.g. a holiday — even if it falls on a day you
         normally work. Patients won't see any open slots for that date.
       </p>
-      <form onSubmit={handleAdd} className="availability-form">
-        <label>
-          Date
+      <form onSubmit={handleAdd} className="dashboard-form">
+        <div className="dashboard-field">
+          <label className="dashboard-label" htmlFor="block-date">
+            Date
+          </label>
           <input
+            id="block-date"
+            className="dashboard-input"
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             min={new Date().toISOString().slice(0, 10)}
             required
           />
-        </label>
-        <label>
-          Reason (optional)
+        </div>
+        <div className="dashboard-field">
+          <label className="dashboard-label" htmlFor="block-reason">
+            Reason (optional)
+          </label>
           <input
+            id="block-reason"
+            className="dashboard-input"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="e.g. Public holiday"
           />
-        </label>
-        <button type="submit">Block date</button>
+        </div>
+        <button type="submit" className="dashboard-button">
+          Block date
+        </button>
       </form>
 
       {error && <p className="error">{error}</p>}
 
       {loading ? (
-        <p>Loading blocked dates...</p>
+        <p className="muted">Loading blocked dates...</p>
       ) : dates.length === 0 ? (
         <p className="muted">No blocked dates — your normal weekly availability applies every day.</p>
       ) : (
-        <ul className="availability-list">
+        <ul className="dashboard-list">
           {dates.map((d) => (
-            <li key={d.id}>
+            <li key={d.id} className="dashboard-list-item">
               <span>
                 {d.date} {d.reason && <span className="muted">— {d.reason}</span>}
               </span>
-              <button type="button" onClick={() => handleDelete(d.id)}>
-                Remove
-              </button>
+              <div className="dashboard-list-item-actions">
+                <button
+                  type="button"
+                  className="dashboard-icon-button dashboard-icon-button--danger"
+                  onClick={() => handleDelete(d.id)}
+                  aria-label="Remove blocked date"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    delete
+                  </span>
+                </button>
+              </div>
             </li>
           ))}
         </ul>

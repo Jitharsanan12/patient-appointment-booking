@@ -1,0 +1,117 @@
+/*
+  Admin section styling. Reuses the existing design system directly
+  rather than inventing new tokens: card/heading/form language from
+  pages/DoctorDashboard.css (cross-imported the same way its own
+  components already cross-import it — see components/AvailabilityManager.jsx
+  for precedent), status badges from pages/MyAppointments.css
+  (.appointment-badge*, using the app's real status values), and the
+  doctor-initials avatar from pages/DoctorList.css.
+
+  This file only adds what those don't already provide: the data-table
+  look shared by "All Appointments" and "Patients".
+*/
+
+/* ---------- Data table, shared by All Appointments and Patients ---------- */
+
+.admin-table-card {
+  background: #ffffff;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.admin-table th {
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid #c6c6cd;
+  background: #f8f9ff;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.01em;
+  font-weight: 600;
+  color: #45464d;
+  white-space: nowrap;
+}
+
+.admin-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e6ea;
+  font-size: 14px;
+  color: #0b1c30;
+  vertical-align: middle;
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table tbody tr:hover td {
+  background: #f8f9ff;
+}
+
+.admin-table-empty {
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: #45464d;
+}
+
+.admin-cancel-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #ba1a1a;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 200ms;
+}
+
+.admin-cancel-link:hover:not(:disabled) {
+  color: #8f1414;
+  text-decoration: underline;
+}
+
+.admin-cancel-link:disabled {
+  color: #c6c6cd;
+  cursor: not-allowed;
+}
+
+/* ---------- Section spacing (Book Appointment card sits above the table) ---------- */
+
+.admin-section {
+  margin-bottom: 32px;
+}
+
+/* ---------- Doctor list row (Manage Doctors), avatar + name/specialty ----------
+   Despite the filename, this stylesheet is the shared "admin-*" one —
+   same pattern as DoctorDashboard.css serving both doctor pages — so
+   ManageDoctors.jsx/PatientsList.jsx import it too, not just
+   AdminDashboard.jsx. */
+
+.admin-doctor-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-doctor-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0b1c30;
+}
+
+.admin-doctor-specialty {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #45464d;
+}

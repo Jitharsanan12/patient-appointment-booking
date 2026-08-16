@@ -1,0 +1,156 @@
+/*
+  Navbar styling, restyled to match the design system introduced for
+  Login/Register (see pages/AuthPages.css for the same color palette,
+  font, and card language) as part of the Doctors List redesign. This
+  component is shared across every page, so these colors now apply
+  site-wide, not just on the Doctors List.
+*/
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #c6c6cd;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #000000;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.navbar-logo {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+}
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.navbar-links a {
+  color: #45464d;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 200ms;
+}
+
+.navbar-links a:hover {
+  color: #006a61;
+}
+
+.navbar-user {
+  color: #45464d;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ---------- Account dropdown (name/role, Change Password, Logout) ----------
+   Reuses the same card language as the rest of the app (see
+   pages/AuthPages.css / pages/DoctorDashboard.css): #c6c6cd border,
+   0.75rem radius, and the same small elevation shadow used on cards. */
+
+.navbar-account {
+  position: relative;
+}
+
+.navbar-account-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 6px 8px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 200ms;
+}
+
+.navbar-account-trigger:hover {
+  background: #f5f6fa;
+}
+
+.navbar-account-avatar {
+  font-size: 24px;
+  color: #76777d;
+}
+
+.navbar-account-chevron {
+  font-size: 18px;
+  color: #76777d;
+  transition: transform 200ms;
+}
+
+.navbar-account-trigger[aria-expanded="true"] .navbar-account-chevron {
+  transform: rotate(180deg);
+}
+
+.navbar-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-dropdown-header {
+  padding: 8px 12px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #e5e6ea;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0b1c30;
+}
+
+.navbar-dropdown-role {
+  font-weight: 400;
+  color: #76777d;
+}
+
+.navbar-dropdown-item {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 8px 12px;
+  background: none;
+  color: #45464d;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms;
+}
+
+.navbar-dropdown-item:hover {
+  background: #f8f9ff;
+  color: #006a61;
+}
+
+.navbar-dropdown-item--danger:hover {
+  background: #fdeceb;
+  color: #ba1a1a;
+}

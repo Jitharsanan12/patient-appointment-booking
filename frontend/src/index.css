@@ -15,41 +15,9 @@ body {
   padding: 1.5rem;
 }
 
-.navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem;
-  background: #1a1a2e;
-  color: white;
-}
-
-.navbar-brand {
-  color: white;
-  font-weight: bold;
-  text-decoration: none;
-  font-size: 1.1rem;
-}
-
-.navbar-links {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.navbar-links a {
-  color: #cfd2e0;
-  text-decoration: none;
-}
-
-.navbar-links a:hover {
-  color: white;
-}
-
-.navbar-user {
-  color: #9fa3bd;
-  font-size: 0.9rem;
-}
+/* .navbar* styles now live in components/Navbar.css, co-located with the
+   component (same pattern as pages/AuthPages.css), since they've been
+   restyled to match that design system. */
 
 button {
   background: #4a5cf5;

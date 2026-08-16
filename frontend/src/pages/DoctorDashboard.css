@@ -1,0 +1,499 @@
+/*
+  Shared styles for the two doctor pages split out of the original
+  combined dashboard: DoctorDashboard.jsx ("My Schedule") and
+  DoctorSettings.jsx (Availability / Visit Type Durations / Block a
+  Date). Extends the same design system as AuthPages.css / DoctorList.css
+  / BookingForm.css / MyAppointments.css — same palette, font,
+  card/shadow language, no new tokens. The visit-type badge below reuses
+  the exact indigo pairing already used in DoctorList.css's avatar
+  palette.
+
+  Scoped under "dashboard-" prefixed classes so this doesn't affect any
+  other page.
+*/
+
+.dashboard-page {
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.dashboard-heading {
+  margin: 0 0 24px;
+  font-size: 32px;
+  line-height: 40px;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  color: #000000;
+}
+
+/* ---------- My Schedule page: full width, no longer sharing a grid
+   column with the settings cards, so it gets more room to breathe. ---------- */
+
+.schedule-page-header {
+  margin-bottom: 28px;
+}
+
+.schedule-page-appointments {
+  gap: 20px;
+}
+
+/* ---------- Settings page: Availability full-width on top, Durations
+   and Block a Date side by side underneath. ---------- */
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "availability availability"
+    "durations    blockdate";
+  gap: 24px;
+  align-items: stretch;
+}
+
+/* display: flex on each area wrapper lets its .dashboard-card (the
+   wrapper's only child) stretch to fill the grid row's height — so
+   Durations and Block a Date match heights regardless of which has
+   more content. */
+.settings-area-availability,
+.settings-area-durations,
+.settings-area-blockdate {
+  display: flex;
+  min-width: 0;
+}
+
+.settings-area-availability {
+  grid-area: availability;
+}
+
+.settings-area-durations {
+  grid-area: durations;
+}
+
+.settings-area-blockdate {
+  grid-area: blockdate;
+}
+
+/* flex: 1 makes the card (each wrapper's only child) fill the wrapper's
+   full width, in addition to the height it already gets from the
+   wrapper's default stretch alignment above. */
+.settings-area-availability .dashboard-card,
+.settings-area-durations .dashboard-card,
+.settings-area-blockdate .dashboard-card {
+  flex: 1;
+}
+
+@media (max-width: 700px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "availability"
+      "durations"
+      "blockdate";
+  }
+}
+
+/* ---------- Shared card shell, used by every section ---------- */
+
+.dashboard-card {
+  background: #ffffff;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.75rem;
+  padding: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-card-title {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #0b1c30;
+}
+
+.dashboard-subheading {
+  margin: 24px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0b1c30;
+}
+
+.dashboard-card-subtitle {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 18px;
+  color: #45464d;
+}
+
+/* ---------- Form fields shared across sidebar cards ---------- */
+
+.dashboard-form {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.dashboard-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 120px;
+}
+
+.dashboard-label {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+  color: #45464d;
+}
+
+.dashboard-select,
+.dashboard-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  color: #0b1c30;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+
+.dashboard-select:focus,
+.dashboard-input:focus {
+  outline: none;
+  border-color: #6bd8cb;
+  box-shadow: 0 0 0 1px #6bd8cb;
+}
+
+.dashboard-button {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 8px 16px;
+  background: #000000;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 200ms;
+  white-space: nowrap;
+}
+
+.dashboard-button:hover:not(:disabled) {
+  background: #131b2e;
+}
+
+.dashboard-button:disabled {
+  background: #c6c6cd;
+  cursor: not-allowed;
+}
+
+.dashboard-button-secondary {
+  border: 1px solid #c6c6cd;
+  border-radius: 0.5rem;
+  padding: 8px 16px;
+  background: #ffffff;
+  color: #45464d;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 200ms, color 200ms;
+}
+
+.dashboard-button-secondary:hover {
+  border-color: #6bd8cb;
+  color: #006a61;
+}
+
+/* ---------- Settings page forms: keep the submit button(s) the same
+   height as the input/select fields beside them, and one fixed width
+   across all three forms (Add window / Save changes, Save durations,
+   Block date) instead of each auto-sizing to its own label text. Scoped
+   to .dashboard-form so the appointment-card buttons on the My Schedule
+   page (which reuse .dashboard-button/-secondary but aren't inside a
+   form) are unaffected. ---------- */
+
+.dashboard-form .dashboard-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 160px;
+  height: 40px;
+  padding: 0 16px;
+}
+
+.dashboard-form .dashboard-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 16px;
+}
+
+/* ---------- Current Schedule / Blocked Dates lists ---------- */
+
+.dashboard-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.dashboard-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #ffffff;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #0b1c30;
+  border-bottom: 1px solid #e5e6ea;
+}
+
+.dashboard-list-item:last-child {
+  border-bottom: none;
+}
+
+.dashboard-list-item.dashboard-list-item--editing {
+  outline: 2px solid #6bd8cb;
+  outline-offset: -2px;
+  background: #eefaf8;
+}
+
+.dashboard-list-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dashboard-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.375rem;
+  background: #ffffff;
+  color: #45464d;
+  cursor: pointer;
+  transition: border-color 200ms, color 200ms;
+}
+
+.dashboard-icon-button .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.dashboard-icon-button:hover {
+  border-color: #6bd8cb;
+  color: #006a61;
+}
+
+.dashboard-icon-button--danger:hover {
+  border-color: #ba1a1a;
+  color: #ba1a1a;
+}
+
+/* ---------- My Schedule (main column) ---------- */
+
+.dashboard-date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 4px 0 20px;
+}
+
+.dashboard-date-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #45464d;
+  cursor: pointer;
+  transition: border-color 200ms, color 200ms;
+}
+
+.dashboard-date-nav-btn:hover {
+  border-color: #6bd8cb;
+  color: #006a61;
+}
+
+.dashboard-date-label {
+  margin: 0;
+  min-width: 160px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0b1c30;
+}
+
+.dashboard-appointments {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dashboard-appointment-card {
+  display: flex;
+  gap: 20px;
+  background: #ffffff;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.75rem;
+  padding: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 300ms;
+}
+
+.dashboard-appointment-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Only the single next upcoming appointment (today only) gets this —
+   every other card looks identical, deliberately. */
+.dashboard-appointment-card--next {
+  border-left: 3px solid #6bd8cb;
+  background: #f8fffe;
+}
+
+.appt-time-block {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-right: 20px;
+  border-right: 1px solid #e5e6ea;
+  min-width: 64px;
+}
+
+.appt-time-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #0b1c30;
+  white-space: nowrap;
+}
+
+.appt-time-meridiem {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #76777d;
+}
+
+.appt-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.appt-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.appt-patient-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0b1c30;
+}
+
+.visit-type-badge {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: #eefaf8;
+  color: #006a61;
+}
+
+.appt-reason {
+  margin: 8px 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #76777d;
+}
+
+.appt-reason-label {
+  margin-right: 4px;
+  font-weight: 600;
+  color: #45464d;
+}
+
+.dashboard-appointment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dashboard-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 56px 24px;
+  background: #ffffff;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.75rem;
+}
+
+.dashboard-empty .material-symbols-outlined {
+  font-size: 40px;
+  color: #c6c6cd;
+  margin-bottom: 12px;
+}
+
+.dashboard-empty p {
+  margin: 0;
+  font-size: 14px;
+  color: #45464d;
+}
+
+/* ---------- Patient info panel (existing feature, restyled) ---------- */
+
+.dashboard-patient-profile {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8f9ff;
+  border-radius: 0.5rem;
+}
+
+.dashboard-patient-profile dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-patient-profile dt {
+  font-size: 12px;
+  color: #76777d;
+}
+
+.dashboard-patient-profile dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: #0b1c30;
+}

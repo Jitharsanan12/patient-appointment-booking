@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getMyProfile, updateMyProfile } from "../api/client";
+import "./MyProfile.css";
 
 const BLANK_PROFILE = {
   date_of_birth: "",
@@ -63,61 +64,131 @@ export default function MyProfile() {
   if (loading) return <p>Loading profile...</p>;
 
   return (
-    <div className="form-page">
-      <h2>My Profile</h2>
-      <p className="muted">
+    <div className="profile-page">
+      <h2 className="profile-heading">My Profile</h2>
+      <p className="profile-subtitle">
         This medical information is visible to doctors you have an appointment with.
       </p>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Date of birth
-          <input
-            type="date"
-            value={form.date_of_birth}
-            onChange={(e) => updateField("date_of_birth", e.target.value)}
-          />
-        </label>
-        <label>
-          Phone number
-          <input
-            value={form.phone_number}
-            onChange={(e) => updateField("phone_number", e.target.value)}
-          />
-        </label>
-        <label>
-          Allergies
-          <textarea
-            value={form.allergies}
-            onChange={(e) => updateField("allergies", e.target.value)}
-          />
-        </label>
-        <label>
-          Existing conditions
-          <textarea
-            value={form.existing_conditions}
-            onChange={(e) => updateField("existing_conditions", e.target.value)}
-          />
-        </label>
-        <label>
-          Emergency contact name
-          <input
-            value={form.emergency_contact_name}
-            onChange={(e) => updateField("emergency_contact_name", e.target.value)}
-          />
-        </label>
-        <label>
-          Emergency contact phone
-          <input
-            value={form.emergency_contact_phone}
-            onChange={(e) => updateField("emergency_contact_phone", e.target.value)}
-          />
-        </label>
-        {error && <p className="error">{error}</p>}
-        {success && <p className="success">{success}</p>}
-        <button type="submit" disabled={saving}>
-          {saving ? "Saving..." : "Save profile"}
-        </button>
-      </form>
+
+      <div className="profile-card">
+        <form className="profile-form" onSubmit={handleSubmit}>
+          <div className="profile-field">
+            <label className="profile-label" htmlFor="date-of-birth">
+              Date of Birth
+            </label>
+            <div className="profile-input-wrap">
+              <input
+                id="date-of-birth"
+                className="profile-input"
+                type="date"
+                value={form.date_of_birth}
+                onChange={(e) => updateField("date_of_birth", e.target.value)}
+              />
+              <span className="material-symbols-outlined profile-icon" aria-hidden="true">
+                calendar_month
+              </span>
+            </div>
+          </div>
+
+          <div className="profile-field">
+            <label className="profile-label" htmlFor="phone-number">
+              Phone Number
+            </label>
+            <div className="profile-input-wrap">
+              <input
+                id="phone-number"
+                className="profile-input"
+                value={form.phone_number}
+                onChange={(e) => updateField("phone_number", e.target.value)}
+              />
+              <span className="material-symbols-outlined profile-icon" aria-hidden="true">
+                call
+              </span>
+            </div>
+          </div>
+
+          <div className="profile-field">
+            <label className="profile-label" htmlFor="allergies">
+              Allergies
+            </label>
+            <div className="profile-input-wrap">
+              <textarea
+                id="allergies"
+                className="profile-textarea"
+                value={form.allergies}
+                onChange={(e) => updateField("allergies", e.target.value)}
+              />
+              <span
+                className="material-symbols-outlined profile-icon profile-icon--top"
+                aria-hidden="true"
+              >
+                warning
+              </span>
+            </div>
+          </div>
+
+          <div className="profile-field">
+            <label className="profile-label" htmlFor="existing-conditions">
+              Existing Conditions
+            </label>
+            <div className="profile-input-wrap">
+              <textarea
+                id="existing-conditions"
+                className="profile-textarea"
+                value={form.existing_conditions}
+                onChange={(e) => updateField("existing_conditions", e.target.value)}
+              />
+              <span
+                className="material-symbols-outlined profile-icon profile-icon--top"
+                aria-hidden="true"
+              >
+                medical_information
+              </span>
+            </div>
+          </div>
+
+          <div className="profile-field">
+            <label className="profile-label" htmlFor="emergency-contact-name">
+              Emergency Contact Name
+            </label>
+            <div className="profile-input-wrap">
+              <input
+                id="emergency-contact-name"
+                className="profile-input"
+                value={form.emergency_contact_name}
+                onChange={(e) => updateField("emergency_contact_name", e.target.value)}
+              />
+              <span className="material-symbols-outlined profile-icon" aria-hidden="true">
+                person
+              </span>
+            </div>
+          </div>
+
+          <div className="profile-field">
+            <label className="profile-label" htmlFor="emergency-contact-phone">
+              Emergency Contact Phone
+            </label>
+            <div className="profile-input-wrap">
+              <input
+                id="emergency-contact-phone"
+                className="profile-input"
+                value={form.emergency_contact_phone}
+                onChange={(e) => updateField("emergency_contact_phone", e.target.value)}
+              />
+              <span className="material-symbols-outlined profile-icon" aria-hidden="true">
+                call
+              </span>
+            </div>
+          </div>
+
+          {error && <p className="error">{error}</p>}
+          {success && <p className="success">{success}</p>}
+
+          <button type="submit" className="profile-button" disabled={saving}>
+            {saving ? "Saving..." : "Save Profile"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

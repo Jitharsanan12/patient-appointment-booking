@@ -1,0 +1,328 @@
+/*
+  Styling for Login.jsx and Register.jsx, translated from the design-tool
+  HTML/Tailwind mockups (design-reference/login-mockup.html and
+  register-mockup.html — since removed, this file is the source of truth
+  now). Hand-written plain CSS rather than adopting Tailwind itself: the
+  rest of the app has no Tailwind setup, and pulling in the framework
+  just for two pages would be a build/tooling change far beyond a
+  visual-only conversion. Every color/spacing/radius/shadow value below
+  is copied directly from the mockups' Tailwind theme config.
+
+  Scoped under "auth-" prefixed classes (plus BEM-ish --login/--register
+  modifiers for the handful of intentional differences between the two
+  mockups) so none of this leaks into the rest of the app's styling —
+  the existing bare `input`/`button`/`form` selectors in index.css keep
+  styling every other page exactly as before.
+
+  Also reused (via a third --change-password modifier, grouped into the
+  --login selectors below wherever the two should look identical) by
+  ChangePassword.jsx/.css, which wants its password fields to match the
+  Login page's field style exactly — see ChangePassword.css for why that
+  page doesn't reuse .auth-page itself.
+*/
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9ff;
+  padding: 16px;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 28rem; /* mockup's max-w-md */
+  background: #ffffff;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.75rem; /* xl */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 300ms, border-color 300ms;
+}
+
+.auth-card--login,
+.auth-card--change-password {
+  padding: 32px;
+}
+
+.auth-card--login:hover,
+.auth-card--change-password:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border-color: #6bd8cb;
+}
+
+/* Unlike the Login/Register cards (centered by the full-viewport
+   .auth-page wrapper), this page keeps the navbar and sits inside the
+   normal .container, so the card centers itself within that. */
+.auth-card--change-password {
+  margin: 0 auto;
+}
+
+.auth-card--register {
+  padding: 24px;
+}
+
+.auth-card--register:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+@media (min-width: 640px) {
+  .auth-card--register {
+    padding: 48px;
+  }
+}
+
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.auth-logo {
+  width: auto;
+  margin-bottom: 8px;
+  object-fit: contain;
+}
+
+.auth-card--login .auth-logo {
+  height: 48px;
+}
+
+.auth-card--register .auth-logo {
+  height: 64px;
+}
+
+.auth-heading {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: #000000;
+}
+
+.auth-card--register .auth-heading {
+  letter-spacing: -0.02em;
+}
+
+.auth-subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  color: #45464d;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.auth-label {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.auth-card--login .auth-label,
+.auth-card--change-password .auth-label {
+  color: #45464d;
+}
+
+.auth-card--register .auth-label {
+  color: #76777d;
+}
+
+.auth-field-top .auth-label {
+  margin-bottom: 0;
+}
+
+.auth-forgot-link {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: #006a61;
+  text-decoration: none;
+  transition: color 200ms;
+}
+
+.auth-forgot-link:hover {
+  color: #6bd8cb;
+}
+
+.auth-input-wrap {
+  position: relative;
+}
+
+.auth-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid #c6c6cd;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  color: #0b1c30;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+
+.auth-input::placeholder {
+  color: #76777d;
+}
+
+.auth-input:focus {
+  outline: none;
+}
+
+/* Icon side + input padding differ between the two mockups: login's icon
+   sits on the right, register's sits on the left. */
+.auth-card--login .auth-input,
+.auth-card--change-password .auth-input {
+  border-radius: 0.375rem; /* Tailwind's default "md" (unmodified in the mockup's theme) */
+  padding-right: 40px;
+}
+
+.auth-card--login .auth-input:focus,
+.auth-card--change-password .auth-input:focus {
+  border-color: #006a61;
+  box-shadow: 0 0 0 1px #006a61;
+}
+
+.auth-card--register .auth-input {
+  border-radius: 0.5rem; /* lg */
+  padding-left: 40px;
+}
+
+.auth-card--register .auth-input:focus {
+  border-color: #6bd8cb;
+  box-shadow: 0 0 0 1px #6bd8cb;
+}
+
+.auth-icon {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  color: #c6c6cd;
+  pointer-events: none;
+  font-size: 20px;
+}
+
+.auth-card--login .auth-icon,
+.auth-card--change-password .auth-icon {
+  right: 0;
+  padding-right: 12px;
+}
+
+.auth-card--register .auth-icon {
+  left: 0;
+  padding-left: 12px;
+}
+
+.auth-button {
+  width: 100%;
+  border: none;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: #ffffff;
+  background: #000000;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: background-color 200ms;
+}
+
+.auth-button:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
+}
+
+.auth-card--login .auth-button,
+.auth-card--change-password .auth-button {
+  margin-top: 8px;
+  padding: 8px 16px;
+  border-radius: 0.375rem;
+}
+
+.auth-card--login .auth-button:hover,
+.auth-card--change-password .auth-button:hover {
+  background: #131b2e;
+}
+
+.auth-card--register .auth-button {
+  margin-top: 8px;
+  padding: 10px 16px;
+  border-radius: 0.5rem;
+}
+
+.auth-card--register .auth-button:hover {
+  background: #213145;
+}
+
+.auth-footer {
+  margin-top: 32px;
+  text-align: center;
+}
+
+.auth-footer p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  color: #45464d;
+}
+
+.auth-link {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 200ms;
+}
+
+.auth-card--login .auth-link {
+  color: #006a61;
+}
+
+.auth-card--login .auth-link:hover {
+  color: #6bd8cb;
+}
+
+.auth-card--register .auth-link {
+  color: #000000;
+  font-weight: 600;
+}
+
+.auth-card--register .auth-link:hover {
+  color: #6bd8cb;
+  text-decoration: underline;
+}
+
+.auth-error {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: #ba1a1a;
+}

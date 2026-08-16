@@ -15,6 +15,8 @@ import {
   updateAvailability,
   deleteAvailability,
 } from "../api/client";
+import "../pages/AuthPages.css";
+import "../pages/DoctorDashboard.css";
 
 // Index 0 = Monday ... 6 = Sunday, matching the backend's day_of_week convention.
 const DAY_NAMES = [
@@ -104,66 +106,102 @@ export default function AvailabilityManager({ doctorId }) {
   }
 
   return (
-    <div className="card availability-manager">
-      <h3>Set Availability</h3>
-      <form onSubmit={handleSubmit} className="availability-form">
-        <label>
-          Day
-          <select value={form.dayOfWeek} onChange={(e) => updateField("dayOfWeek", e.target.value)}>
+    <div className="dashboard-card">
+      <h3 className="dashboard-card-title">Set Availability</h3>
+
+      <form onSubmit={handleSubmit} className="dashboard-form">
+        <div className="dashboard-field">
+          <label className="dashboard-label" htmlFor="avail-day">
+            Day of Week
+          </label>
+          <select
+            id="avail-day"
+            className="dashboard-select"
+            value={form.dayOfWeek}
+            onChange={(e) => updateField("dayOfWeek", e.target.value)}
+          >
             {DAY_NAMES.map((name, index) => (
               <option key={index} value={index}>
                 {name}
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          Start time
+        </div>
+        <div className="dashboard-field">
+          <label className="dashboard-label" htmlFor="avail-start">
+            Start Time
+          </label>
           <input
+            id="avail-start"
+            className="dashboard-input"
             type="time"
             value={form.startTime}
             onChange={(e) => updateField("startTime", e.target.value)}
             required
           />
-        </label>
-        <label>
-          End time
+        </div>
+        <div className="dashboard-field">
+          <label className="dashboard-label" htmlFor="avail-end">
+            End Time
+          </label>
           <input
+            id="avail-end"
+            className="dashboard-input"
             type="time"
             value={form.endTime}
             onChange={(e) => updateField("endTime", e.target.value)}
             required
           />
-        </label>
-        <div className="button-row">
-          <button type="submit">{editingId ? "Save changes" : "Add window"}</button>
-          {editingId && (
-            <button type="button" onClick={cancelEditing}>
-              Cancel edit
-            </button>
-          )}
         </div>
+        <button type="submit" className="dashboard-button">
+          {editingId ? "Save changes" : "Add window"}
+        </button>
+        {editingId && (
+          <button type="button" className="dashboard-button-secondary" onClick={cancelEditing}>
+            Cancel edit
+          </button>
+        )}
       </form>
 
       {error && <p className="error">{error}</p>}
 
+      <h4 className="dashboard-subheading">Current Schedule</h4>
       {loading ? (
-        <p>Loading availability...</p>
+        <p className="muted">Loading availability...</p>
       ) : windows.length === 0 ? (
         <p className="muted">No availability windows set yet — patients can't book you until you add one.</p>
       ) : (
-        <ul className="availability-list">
+        <ul className="dashboard-list">
           {windows.map((w) => (
-            <li key={w.id} className={editingId === w.id ? "editing" : ""}>
+            <li
+              key={w.id}
+              className={
+                "dashboard-list-item" + (editingId === w.id ? " dashboard-list-item--editing" : "")
+              }
+            >
               <span>
                 {DAY_NAMES[w.day_of_week]} {w.start_time.slice(0, 5)}–{w.end_time.slice(0, 5)}
               </span>
-              <div className="button-row">
-                <button type="button" onClick={() => startEditing(w)}>
-                  Edit
+              <div className="dashboard-list-item-actions">
+                <button
+                  type="button"
+                  className="dashboard-icon-button"
+                  onClick={() => startEditing(w)}
+                  aria-label="Edit window"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    edit
+                  </span>
                 </button>
-                <button type="button" onClick={() => handleDelete(w.id)}>
-                  Remove
+                <button
+                  type="button"
+                  className="dashboard-icon-button dashboard-icon-button--danger"
+                  onClick={() => handleDelete(w.id)}
+                  aria-label="Remove window"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    delete
+                  </span>
                 </button>
               </div>
             </li>
