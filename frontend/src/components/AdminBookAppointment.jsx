@@ -98,6 +98,13 @@ export default function AdminBookAppointment({ onBooked }) {
       setFormError("Please select a time slot.");
       return;
     }
+    // Mirrors the backend's own check (see AdminBookAppointmentRequest in
+    // app/schemas.py) — a blank or single-character reason isn't
+    // meaningful enough for a doctor to act on.
+    if (reason.trim().length < 3) {
+      setFormError("Reason for visit must be at least 3 characters long");
+      return;
+    }
 
     setSubmitting(true);
     try {

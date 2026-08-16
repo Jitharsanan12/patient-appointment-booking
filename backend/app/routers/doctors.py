@@ -21,7 +21,18 @@ def list_doctors(
 ):
     # joinedload fetches the related User (for full_name) in the same query,
     # instead of firing off a separate query per doctor.
-    doctors = db.query(models.Doctor).options(joinedload(models.Doctor.user)).all()
+    # Deactivated doctors (see User.is_active) are filtered out here — this
+    # is the endpoint patients browse and the booking flow's doctor
+    # dropdown both use, so a deactivated doctor simply never appears to
+    # book. Their appointment history is untouched and still visible to
+    # admin via GET /admin/doctors below.
+    doctors = (
+        db.query(models.Doctor)
+        .join(models.User, models.Doctor.user_id == models.User.id)
+        .options(joinedload(models.Doctor.user))
+        .filter(models.User.is_active == True)  # noqa: E712
+        .all()
+    )
 
     return [
         schemas.DoctorOut(
@@ -29,6 +40,7 @@ def list_doctors(
             full_name=d.user.full_name,
             specialization=d.specialization,
             bio=d.bio,
+            is_active=True,
         )
         for d in doctors
     ]
@@ -54,6 +66,7 @@ def get_my_doctor_profile(
         full_name=doctor.user.full_name,
         specialization=doctor.specialization,
         bio=doctor.bio,
+        is_active=doctor.user.is_active,
     )
 
 
@@ -188,6 +201,79 @@ def delete_availability(
     return None
 
 
+# ---------- Recurring breaks within one availability window (doctor-only, own profile) ----------
+
+def _get_own_availability_or_404(db: Session, doctor_id: int, availability_id: int) -> models.Availability:
+    availability = (
+        db.query(models.Availability)
+        .filter(
+            models.Availability.id == availability_id,
+            models.Availability.doctor_id == doctor_id,
+        )
+        .first()
+    )
+    if not availability:
+        raise HTTPException(status_code=404, detail="Availability window not found")
+    return availability
+
+
+@router.post(
+    "/{doctor_id}/availability/{availability_id}/breaks",
+    response_model=schemas.AvailabilityBreakOut,
+    status_code=201,
+)
+def create_availability_break(
+    doctor_id: int,
+    availability_id: int,
+    payload: schemas.AvailabilityBreakCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.UserRole.doctor)),
+):
+    _get_doctor_or_404(db, doctor_id)
+    _require_own_doctor_profile(current_user, doctor_id, db)
+    _get_own_availability_or_404(db, doctor_id, availability_id)
+
+    availability_break = models.AvailabilityBreak(
+        availability_id=availability_id,
+        break_start=payload.break_start,
+        break_end=payload.break_end,
+    )
+    db.add(availability_break)
+    db.commit()
+    db.refresh(availability_break)
+    return availability_break
+
+
+@router.delete(
+    "/{doctor_id}/availability/{availability_id}/breaks/{break_id}", status_code=204
+)
+def delete_availability_break(
+    doctor_id: int,
+    availability_id: int,
+    break_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.UserRole.doctor)),
+):
+    _get_doctor_or_404(db, doctor_id)
+    _require_own_doctor_profile(current_user, doctor_id, db)
+    _get_own_availability_or_404(db, doctor_id, availability_id)
+
+    availability_break = (
+        db.query(models.AvailabilityBreak)
+        .filter(
+            models.AvailabilityBreak.id == break_id,
+            models.AvailabilityBreak.availability_id == availability_id,
+        )
+        .first()
+    )
+    if not availability_break:
+        raise HTTPException(status_code=404, detail="Break not found")
+
+    db.delete(availability_break)
+    db.commit()
+    return None
+
+
 # ---------- One-off unavailable dates (doctor-only, own profile) ----------
 
 @router.post(
@@ -216,7 +302,11 @@ def create_unavailable_date(
         raise HTTPException(status_code=400, detail="This date is already marked unavailable")
 
     override = models.AvailabilityOverride(
-        doctor_id=doctor_id, date=payload.date, reason=payload.reason
+        doctor_id=doctor_id,
+        date=payload.date,
+        reason=payload.reason,
+        blocked_start=payload.blocked_start,
+        blocked_end=payload.blocked_end,
     )
     db.add(override)
     db.commit()
@@ -410,13 +500,19 @@ def compute_available_slots(
     for a visit that takes duration_minutes, using gap-based scheduling:
 
     1. Check whether the doctor has marked target_date as a one-off
-       unavailable day (AvailabilityOverride) — if so, no slots at all.
+       unavailable day (AvailabilityOverride). If it's a FULL-day block
+       (blocked_start is null), no slots at all — same as before. If
+       it's a PARTIAL block (blocked_start/blocked_end both set), keep
+       going — that one range gets subtracted in step 3 below, exactly
+       like a booked appointment, instead of wiping out the whole day.
     2. Find the doctor's recurring availability windows for that day of
        the week — their nominal working hours.
     3. Subtract every already-booked ("scheduled") appointment's ACTUAL
-       time range (appointment_date to appointment_date + its own
-       duration_minutes) from those windows, leaving the doctor's real
-       free gaps for the day (see _free_gaps_in_window).
+       time range, every recurring break linked to that window (see
+       AvailabilityBreak in models.py — these apply every week the
+       window is active, not just a specific date), and the partial-day
+       block from step 1 if any, from those windows — leaving the
+       doctor's real free gaps for the day (see _free_gaps_in_window).
     4. Step a candidate start time through each gap in SLOT_STEP_MINUTES
        increments, keeping a candidate only if [candidate, candidate +
        duration_minutes] fits entirely inside that ONE gap — never
@@ -434,22 +530,33 @@ def compute_available_slots(
     endpoint and validate_and_create_appointment, which validates a
     booking request against this exact same list.
     """
-    is_blocked = (
+    # A deactivated doctor (see User.is_active) has no bookable slots —
+    # checked here, the single shared source of truth reused by both
+    # GET /available-slots and validate_and_create_appointment, so a
+    # deactivated doctor is transparently unbookable through both paths
+    # without duplicating this check anywhere else.
+    doctor = (
+        db.query(models.Doctor).options(joinedload(models.Doctor.user)).filter(models.Doctor.id == doctor_id).first()
+    )
+    if doctor is None or not doctor.user.is_active:
+        return []
+
+    override = (
         db.query(models.AvailabilityOverride)
         .filter(
             models.AvailabilityOverride.doctor_id == doctor_id,
             models.AvailabilityOverride.date == target_date,
         )
         .first()
-        is not None
     )
-    if is_blocked:
+    if override is not None and override.blocked_start is None:
         return []
 
     day_of_week = target_date.weekday()  # Monday=0 ... Sunday=6, same as our storage convention
 
     windows = (
         db.query(models.Availability)
+        .options(joinedload(models.Availability.breaks))
         .filter(
             models.Availability.doctor_id == doctor_id,
             models.Availability.day_of_week == day_of_week,
@@ -481,6 +588,17 @@ def compute_available_slots(
         for a in booked_appointments
     ]
 
+    # The partial-day block (if any) from step 1 above — one interval,
+    # subtracted from every window on this date just like a booking.
+    blocked_range_intervals = []
+    if override is not None and override.blocked_start is not None:
+        blocked_range_intervals = [
+            (
+                datetime.combine(target_date, override.blocked_start),
+                datetime.combine(target_date, override.blocked_end),
+            )
+        ]
+
     # datetime.now() here is deliberately naive/local (not
     # datetime.now(timezone.utc)) — it's compared directly against the
     # naive clinic-local appointment_date values above. This assumes the
@@ -496,7 +614,23 @@ def compute_available_slots(
         window_start = datetime.combine(target_date, window.start_time)
         window_end = datetime.combine(target_date, window.end_time)
 
-        for gap_start, gap_end in _free_gaps_in_window(window_start, window_end, booked_intervals):
+        # This window's own recurring breaks, resolved to this specific
+        # date the same way window_start/window_end are — break_start/
+        # break_end carry no date of their own, so they apply every week.
+        break_intervals = [
+            (
+                datetime.combine(target_date, availability_break.break_start),
+                datetime.combine(target_date, availability_break.break_end),
+            )
+            for availability_break in window.breaks
+        ]
+
+        removed_intervals = sorted(
+            booked_intervals + break_intervals + blocked_range_intervals,
+            key=lambda interval: interval[0],
+        )
+
+        for gap_start, gap_end in _free_gaps_in_window(window_start, window_end, removed_intervals):
             candidate = gap_start
             while candidate + duration <= gap_end:
                 if candidate >= now:

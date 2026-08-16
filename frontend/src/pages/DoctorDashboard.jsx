@@ -14,6 +14,7 @@ import {
 } from "../api/client";
 import "./AuthPages.css";
 import "./DoctorDashboard.css";
+import "./MyAppointments.css";
 
 // Medical profile fields to show, in display order — paired with the raw
 // field name so a missing value can fall back to "Not provided".
@@ -219,14 +220,22 @@ export default function DoctorDashboard() {
                 <div className="appt-time-block">
                   <span className="appt-time-value">{time}</span>
                   <span className="appt-time-meridiem">{meridiem}</span>
+                  {nextAppointment && nextAppointment.id === appt.id && (
+                    <span className="appt-next-label">Next Up</span>
+                  )}
                 </div>
 
                 <div className="appt-card-body">
                   <div className="appt-card-top">
                     <p className="appt-patient-name">{appt.patient_name}</p>
-                    <span className="visit-type-badge">
-                      {appt.visit_type} · {appt.duration_minutes} min
-                    </span>
+                    <div className="appt-card-badges">
+                      <span className={`appointment-badge appointment-badge--${appt.status}`}>
+                        {appt.status}
+                      </span>
+                      <span className="visit-type-badge">
+                        {appt.visit_type} · {appt.duration_minutes} min
+                      </span>
+                    </div>
                   </div>
                   <p className="appt-reason">
                     <span className="appt-reason-label">Reason:</span>

@@ -79,6 +79,18 @@ def get_current_user(
     user = db.query(models.User).filter(models.User.id == int(user_id)).first()
     if user is None:
         raise credentials_exception
+
+    # A deactivated account (see User.is_active in models.py) shouldn't be
+    # usable via an already-issued token either — otherwise deactivation
+    # wouldn't take effect until that token's 24h expiry. Reuses the same
+    # generic 401 as an invalid/expired token rather than a specific
+    # "deactivated" message: this dependency guards every authenticated
+    # endpoint, not just login, so it's a defense-in-depth backstop, not
+    # the primary UX path (that's login, and the frontend clearing its
+    # own token immediately after a successful self-deactivation).
+    if not user.is_active:
+        raise credentials_exception
+
     return user
 
 

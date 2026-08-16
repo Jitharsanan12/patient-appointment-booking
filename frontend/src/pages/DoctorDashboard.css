@@ -122,6 +122,71 @@
   color: #45464d;
 }
 
+/* ---------- Breaks editor (shown while editing an existing availability
+   window) — just a visual divider from the main add/edit form above it,
+   everything inside it reuses the same dashboard-form/list classes. ---------- */
+
+.avail-breaks-editor {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e6ea;
+}
+
+/* ---------- Block-type segmented control (Block a Date) ---------- */
+
+.segmented-control {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid #c6c6cd;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.segmented-control-option {
+  border: none;
+  background: #ffffff;
+  color: #45464d;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 200ms, color 200ms;
+}
+
+.segmented-control-option + .segmented-control-option {
+  border-left: 1px solid #c6c6cd;
+}
+
+.segmented-control-option:hover:not(.segmented-control-option--active) {
+  color: #006a61;
+}
+
+.segmented-control-option--active {
+  background: #000000;
+  color: #ffffff;
+}
+
+/* Start/End time fields shown only in "Specific Hours" mode — kept
+   mounted (rather than conditionally rendered) so toggling between
+   modes animates smoothly instead of popping in/out. flex-basis 100%
+   puts them on their own full-width row within the flex-wrap form,
+   directly below the segmented control above. */
+.block-hours-fields {
+  flex: 1 1 100%;
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 300ms ease, opacity 200ms ease;
+}
+
+.block-hours-fields--visible {
+  max-height: 100px;
+  opacity: 1;
+}
+
 /* ---------- Form fields shared across sidebar cards ---------- */
 
 .dashboard-form {
@@ -146,6 +211,18 @@
   letter-spacing: 0.01em;
   font-weight: 500;
   color: #45464d;
+}
+
+/* Wrap + extra right padding for the one dashboard-style input that
+   carries an icon — the admin Create Doctor password field's
+   show/hide toggle (see components/PasswordVisibilityToggle.jsx and
+   its shared .password-visibility-toggle styling in AuthPages.css). */
+.dashboard-input-wrap {
+  position: relative;
+}
+
+.dashboard-input--toggle-right {
+  padding-right: 40px;
 }
 
 .dashboard-select,
@@ -399,6 +476,19 @@
   color: #76777d;
 }
 
+/* Explains the card's teal left-border highlight (see
+   .dashboard-appointment-card--next above) — shown only on that same
+   card, so the highlight is never just an unexplained color. */
+.appt-next-label {
+  margin-top: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #006a61;
+  text-align: center;
+}
+
 .appt-card-body {
   flex: 1;
   min-width: 0;
@@ -416,6 +506,17 @@
   font-size: 16px;
   font-weight: 700;
   color: #0b1c30;
+}
+
+/* Groups the status badge (.appointment-badge*, reused as-is from
+   pages/MyAppointments.css) above the existing visit-type badge, since a
+   card can now show both. */
+.appt-card-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .visit-type-badge {

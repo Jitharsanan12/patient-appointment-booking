@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { changePassword } from "../api/client";
+import PasswordVisibilityToggle from "../components/PasswordVisibilityToggle";
 import "./AuthPages.css";
 import "./ChangePassword.css";
 
@@ -10,6 +11,11 @@ export default function ChangePassword() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  // Each field toggles independently — revealing the new password
+  // shouldn't force the current password to reveal too, and vice versa.
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -19,6 +25,10 @@ export default function ChangePassword() {
     setError("");
     setSuccess("");
 
+    if (newPassword.length < 8) {
+      setError("New password must be at least 8 characters long");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setError("New password and confirmation do not match");
       return;
@@ -52,15 +62,16 @@ export default function ChangePassword() {
               <input
                 id="current-password"
                 className="auth-input"
-                type="password"
+                type={showCurrentPassword ? "text" : "password"}
                 autoComplete="current-password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
               />
-              <span className="material-symbols-outlined auth-icon" aria-hidden="true">
-                lock
-              </span>
+              <PasswordVisibilityToggle
+                visible={showCurrentPassword}
+                onToggle={() => setShowCurrentPassword((prev) => !prev)}
+              />
             </div>
           </div>
 
@@ -72,16 +83,17 @@ export default function ChangePassword() {
               <input
                 id="new-password"
                 className="auth-input"
-                type="password"
+                type={showNewPassword ? "text" : "password"}
                 autoComplete="new-password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 minLength={8}
                 required
               />
-              <span className="material-symbols-outlined auth-icon" aria-hidden="true">
-                lock
-              </span>
+              <PasswordVisibilityToggle
+                visible={showNewPassword}
+                onToggle={() => setShowNewPassword((prev) => !prev)}
+              />
             </div>
           </div>
 
@@ -93,16 +105,17 @@ export default function ChangePassword() {
               <input
                 id="confirm-password"
                 className="auth-input"
-                type="password"
+                type={showConfirmPassword ? "text" : "password"}
                 autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 minLength={8}
                 required
               />
-              <span className="material-symbols-outlined auth-icon" aria-hidden="true">
-                lock
-              </span>
+              <PasswordVisibilityToggle
+                visible={showConfirmPassword}
+                onToggle={() => setShowConfirmPassword((prev) => !prev)}
+              />
             </div>
           </div>
 

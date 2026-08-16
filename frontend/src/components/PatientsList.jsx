@@ -4,7 +4,7 @@
 */
 
 import { useEffect, useState } from "react";
-import { listPatients, getPatientAppointmentHistory } from "../api/client";
+import { listPatients, getPatientAppointmentHistory, deactivatePatientAsAdmin } from "../api/client";
 import "../pages/DoctorDashboard.css";
 import "../pages/MyAppointments.css";
 import "../pages/AdminDashboard.css";
@@ -13,6 +13,7 @@ export default function PatientsList() {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deactivatingId, setDeactivatingId] = useState(null);
 
   // Which patient's history is currently expanded, and what was fetched
   // for them.
@@ -21,12 +22,34 @@ export default function PatientsList() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
 
-  useEffect(() => {
+  function load() {
+    setLoading(true);
     listPatients()
       .then(setPatients)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(load, []);
+
+  async function handleDeactivate(patient) {
+    const confirmed = window.confirm(
+      `Deactivate ${patient.full_name}'s account? They will no longer be able to log in. ` +
+        `Their appointments and history are kept exactly as they are.`
+    );
+    if (!confirmed) return;
+
+    setError("");
+    setDeactivatingId(patient.id);
+    try {
+      await deactivatePatientAsAdmin(patient.id);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeactivatingId(null);
+    }
+  }
 
   function handleSelectPatient(patient) {
     if (selectedPatient?.id === patient.id) {
@@ -60,6 +83,7 @@ export default function PatientsList() {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Registered</th>
+                  <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -70,13 +94,34 @@ export default function PatientsList() {
                     <td>{patient.email}</td>
                     <td>{new Date(patient.created_at).toLocaleDateString()}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="dashboard-button-secondary"
-                        onClick={() => handleSelectPatient(patient)}
+                      <span
+                        className={`admin-status-badge admin-status-badge--${
+                          patient.is_active ? "active" : "inactive"
+                        }`}
                       >
-                        {selectedPatient?.id === patient.id ? "Hide history" : "View history"}
-                      </button>
+                        {patient.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="admin-table-actions">
+                        <button
+                          type="button"
+                          className="dashboard-button-secondary"
+                          onClick={() => handleSelectPatient(patient)}
+                        >
+                          {selectedPatient?.id === patient.id ? "Hide history" : "View history"}
+                        </button>
+                        {patient.is_active && (
+                          <button
+                            type="button"
+                            className="admin-cancel-link"
+                            onClick={() => handleDeactivate(patient)}
+                            disabled={deactivatingId === patient.id}
+                          >
+                            {deactivatingId === patient.id ? "Deactivating..." : "Deactivate"}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

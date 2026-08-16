@@ -83,17 +83,44 @@ def _make_doctor(db, email="doctor@example.com", name="Dr. Test") -> models.Doct
     return doctor
 
 
-def _make_availability(db, doctor, day_of_week, start: time, end: time):
-    db.add(
-        models.Availability(
-            doctor_id=doctor.id,
-            day_of_week=day_of_week,
-            start_time=start,
-            end_time=end,
-            slot_duration_minutes=30,  # legacy field, no longer read by scheduling
-        )
+def _make_availability(db, doctor, day_of_week, start: time, end: time) -> models.Availability:
+    availability = models.Availability(
+        doctor_id=doctor.id,
+        day_of_week=day_of_week,
+        start_time=start,
+        end_time=end,
+        slot_duration_minutes=30,  # legacy field, no longer read by scheduling
     )
+    db.add(availability)
     db.commit()
+    db.refresh(availability)
+    return availability
+
+
+def _make_break(db, availability, start: time, end: time) -> models.AvailabilityBreak:
+    availability_break = models.AvailabilityBreak(
+        availability_id=availability.id, break_start=start, break_end=end
+    )
+    db.add(availability_break)
+    db.commit()
+    db.refresh(availability_break)
+    return availability_break
+
+
+def _make_override(
+    db, doctor, on_date: date, blocked_start: time = None, blocked_end: time = None, reason=None
+) -> models.AvailabilityOverride:
+    override = models.AvailabilityOverride(
+        doctor_id=doctor.id,
+        date=on_date,
+        reason=reason,
+        blocked_start=blocked_start,
+        blocked_end=blocked_end,
+    )
+    db.add(override)
+    db.commit()
+    db.refresh(override)
+    return override
 
 
 def _set_duration(db, doctor, visit_type: models.VisitType, minutes: int):
@@ -267,3 +294,204 @@ def test_unconfigured_doctor_gets_default_durations(db):
     assert get_visit_type_duration(db, doctor.id, models.VisitType.follow_up) == 15
     assert get_visit_type_duration(db, doctor.id, models.VisitType.consultation) == 30
     assert get_visit_type_duration(db, doctor.id, models.VisitType.new_patient) == 45
+
+
+# ---------- Tests for AvailabilityBreak (multiple recurring breaks) and
+# partial-day AvailabilityOverride blocking ----------
+
+
+def _slot_overlaps(slot: dict, range_start: datetime, range_end: datetime) -> bool:
+    return slot["start_time"] < range_end and range_start < slot["end_time"]
+
+
+# ---------- 6. Multiple breaks on the same window are all subtracted, every week ----------
+
+
+def test_multiple_breaks_subtracted_every_week(db):
+    doctor = _make_doctor(db)
+    monday = _future_monday()
+    monday_next_week = monday + timedelta(days=7)
+    availability = _make_availability(db, doctor, day_of_week=0, start=time(9, 0), end=time(17, 0))
+
+    # A short mid-morning break AND a separate lunch break on the SAME window.
+    _make_break(db, availability, time(10, 30), time(10, 45))
+    _make_break(db, availability, time(12, 0), time(13, 0))
+
+    for target_monday in (monday, monday_next_week):
+        slots = compute_available_slots(db, doctor.id, target_monday, duration_minutes=30)
+        assert len(slots) > 0  # the window isn't fully consumed by the breaks
+
+        break_1 = (_dt(target_monday, 10, 30), _dt(target_monday, 10, 45))
+        break_2 = (_dt(target_monday, 12, 0), _dt(target_monday, 13, 0))
+        for slot in slots:
+            assert not _slot_overlaps(slot, *break_1), f"{slot} overlaps break 1 on {target_monday}"
+            assert not _slot_overlaps(slot, *break_2), f"{slot} overlaps break 2 on {target_monday}"
+
+    # Booking directly inside either break must be rejected, on both weeks
+    # — proving the breaks are genuinely enforced by the booking path too,
+    # not just visible in the slots list, and that they recur.
+    patient = _make_patient(db)
+    for target_monday in (monday, monday_next_week):
+        with pytest.raises(HTTPException) as exc_info:
+            validate_and_create_appointment(
+                db, patient.id, doctor.id, _dt(target_monday, 10, 35), "checkup",
+                models.VisitType.follow_up,
+            )
+        assert exc_info.value.status_code == 400
+        with pytest.raises(HTTPException) as exc_info:
+            validate_and_create_appointment(
+                db, patient.id, doctor.id, _dt(target_monday, 12, 15), "checkup",
+                models.VisitType.follow_up,
+            )
+        assert exc_info.value.status_code == 400
+
+
+# ---------- 7. Breaks don't interfere with each other or with booked appointments ----------
+
+
+def test_breaks_and_booked_appointments_coexist_correctly(db):
+    monday = _future_monday()
+    patient = _make_patient(db)
+    doctor = _make_doctor(db)
+    availability = _make_availability(db, doctor, day_of_week=0, start=time(9, 0), end=time(12, 0))
+    _make_break(db, availability, time(9, 30), time(9, 45))
+    _make_break(db, availability, time(10, 30), time(10, 45))
+
+    # Book Consultation (30 min) at 11:00 -> occupies [11:00, 11:30), well
+    # clear of both breaks.
+    booked = validate_and_create_appointment(
+        db, patient.id, doctor.id, _dt(monday, 11, 0), "consult", models.VisitType.consultation
+    )
+    assert booked.id is not None
+
+    slots = compute_available_slots(db, doctor.id, monday, duration_minutes=30)
+    break_1 = (_dt(monday, 9, 30), _dt(monday, 9, 45))
+    break_2 = (_dt(monday, 10, 30), _dt(monday, 10, 45))
+    booked_range = (_dt(monday, 11, 0), _dt(monday, 11, 30))
+    for slot in slots:
+        assert not _slot_overlaps(slot, *break_1)
+        assert not _slot_overlaps(slot, *break_2)
+        assert not _slot_overlaps(slot, *booked_range)
+
+    # Each gap between the removed ranges still produces its own valid
+    # slot, proving the breaks didn't merge into (or swallow) each other
+    # or the booking: exactly at 09:00 (right up to break 1), at 09:45
+    # (between the two breaks), and at 11:30 (right after the booking,
+    # before the window closes at 12:00).
+    slot_starts = {slot["start_time"] for slot in slots}
+    assert _dt(monday, 9, 0) in slot_starts
+    assert _dt(monday, 9, 45) in slot_starts
+    assert _dt(monday, 11, 30) in slot_starts
+
+    # And a booking attempt landing inside a break is still rejected, same
+    # as before — breaks aren't just cosmetic in the slots list.
+    with pytest.raises(HTTPException) as exc_info:
+        validate_and_create_appointment(
+            db, patient.id, doctor.id, _dt(monday, 9, 35), "checkup", models.VisitType.follow_up
+        )
+    assert exc_info.value.status_code == 400
+
+
+# ---------- 8. A one-off hour block only affects its specific date ----------
+
+
+def test_partial_day_block_only_affects_its_own_date(db):
+    doctor = _make_doctor(db)
+    monday = _future_monday()
+    monday_next_week = monday + timedelta(days=7)
+    _make_availability(db, doctor, day_of_week=0, start=time(9, 0), end=time(17, 0))
+
+    # Block only 12:00-13:00 on ONE specific Monday — the rest of that day,
+    # and every other Monday, should be unaffected.
+    _make_override(db, doctor, monday, blocked_start=time(12, 0), blocked_end=time(13, 0))
+
+    blocked_range = (_dt(monday, 12, 0), _dt(monday, 13, 0))
+    slots_on_blocked_date = compute_available_slots(db, doctor.id, monday, duration_minutes=30)
+    assert len(slots_on_blocked_date) > 0
+    for slot in slots_on_blocked_date:
+        assert not _slot_overlaps(slot, *blocked_range)
+    # Slots right before/after the blocked range are still bookable.
+    slot_starts = {slot["start_time"] for slot in slots_on_blocked_date}
+    assert _dt(monday, 11, 30) in slot_starts
+    assert _dt(monday, 13, 0) in slot_starts
+
+    # The following Monday has no override at all — 12:00 must be a valid
+    # slot there, proving the block didn't leak into the recurring window.
+    slots_next_week = compute_available_slots(db, doctor.id, monday_next_week, duration_minutes=30)
+    slot_starts_next_week = {slot["start_time"] for slot in slots_next_week}
+    assert _dt(monday_next_week, 12, 0) in slot_starts_next_week
+
+    # Booking inside the blocked range on the blocked date is rejected...
+    patient = _make_patient(db)
+    with pytest.raises(HTTPException) as exc_info:
+        validate_and_create_appointment(
+            db, patient.id, doctor.id, _dt(monday, 12, 0), "consult", models.VisitType.consultation
+        )
+    assert exc_info.value.status_code == 400
+
+    # ...but the exact same time, the following week, succeeds.
+    appt = validate_and_create_appointment(
+        db, patient.id, doctor.id, _dt(monday_next_week, 12, 0), "consult",
+        models.VisitType.consultation,
+    )
+    assert appt.id is not None
+
+
+# ---------- 9. Full-day block still behaves exactly as before ----------
+
+
+def test_full_day_block_still_blocks_everything(db):
+    """Regression check: creating an override with blocked_start/blocked_end
+    left null (the original, still-default shape) must still wipe out the
+    whole day, exactly as it did before partial blocking existed."""
+    doctor = _make_doctor(db)
+    monday = _future_monday()
+    _make_availability(db, doctor, day_of_week=0, start=time(9, 0), end=time(17, 0))
+    _make_override(db, doctor, monday, reason="Public holiday")
+
+    assert compute_available_slots(db, doctor.id, monday, duration_minutes=30) == []
+
+
+# ---------- 10. Breaks, a partial block, and a booked appointment all work together ----------
+
+
+def test_breaks_partial_block_and_booking_all_combine_correctly(db):
+    doctor = _make_doctor(db)
+    patient = _make_patient(db)
+    monday = _future_monday()
+    monday_next_week = monday + timedelta(days=7)
+    availability = _make_availability(db, doctor, day_of_week=0, start=time(8, 0), end=time(18, 0))
+    _make_break(db, availability, time(10, 0), time(10, 15))
+    _make_break(db, availability, time(13, 0), time(13, 30))  # lunch
+    # Only THIS Monday additionally has a one-off partial block.
+    _make_override(db, doctor, monday, blocked_start=time(15, 0), blocked_end=time(15, 30))
+
+    booked = validate_and_create_appointment(
+        db, patient.id, doctor.id, _dt(monday, 9, 0), "consult", models.VisitType.consultation
+    )
+    assert booked.id is not None
+
+    slots = compute_available_slots(db, doctor.id, monday, duration_minutes=30)
+    removed_ranges = [
+        (_dt(monday, 9, 0), _dt(monday, 9, 30)),  # booked appointment
+        (_dt(monday, 10, 0), _dt(monday, 10, 15)),  # break 1
+        (_dt(monday, 13, 0), _dt(monday, 13, 30)),  # break 2 / lunch
+        (_dt(monday, 15, 0), _dt(monday, 15, 30)),  # this date's partial block
+    ]
+    for slot in slots:
+        for range_start, range_end in removed_ranges:
+            assert not _slot_overlaps(slot, range_start, range_end)
+
+    # A slot genuinely free of all four still shows up, e.g. right after
+    # the booked appointment ends.
+    slot_starts = {slot["start_time"] for slot in slots}
+    assert _dt(monday, 9, 30) in slot_starts
+
+    # The following Monday: no booking, no partial block — but the breaks
+    # (recurring) still apply. 15:00 is free there (the block didn't
+    # leak), while 10:00 and 13:00 remain excluded (the breaks did recur).
+    slots_next_week = compute_available_slots(db, doctor.id, monday_next_week, duration_minutes=30)
+    next_week_starts = {slot["start_time"] for slot in slots_next_week}
+    assert _dt(monday_next_week, 15, 0) in next_week_starts
+    assert _dt(monday_next_week, 10, 0) not in next_week_starts
+    assert _dt(monday_next_week, 13, 0) not in next_week_starts

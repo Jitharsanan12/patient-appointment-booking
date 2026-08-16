@@ -63,6 +63,15 @@ export function loginUser(email, password) {
   return request("/auth/login", { method: "POST", body: { email, password } });
 }
 
+// Reverses a patient's self-deactivation (see deactivateMyAccount below) —
+// re-proves identity with the same email/password shape as loginUser, and
+// on success logs the account straight in (same {access_token} response
+// shape). Rejected server-side for any non-patient role, even with the
+// correct password — see POST /auth/reactivate in routers/auth.py.
+export function reactivateAccount(email, password) {
+  return request("/auth/reactivate", { method: "POST", body: { email, password } });
+}
+
 export function getMe() {
   return request("/auth/me");
 }
@@ -71,6 +80,30 @@ export function changePassword(currentPassword, newPassword) {
   return request("/auth/me/password", {
     method: "PUT",
     body: { current_password: currentPassword, new_password: newPassword },
+  });
+}
+
+// Both return the same {"message": "..."} shape regardless of outcome
+// for forgotPassword (see the backend docstring on POST
+// /auth/forgot-password) — that's deliberate, not something to branch on.
+export function forgotPassword(email) {
+  return request("/auth/forgot-password", { method: "POST", body: { email } });
+}
+
+export function resetPassword(token, newPassword) {
+  return request("/auth/reset-password", {
+    method: "POST",
+    body: { token, new_password: newPassword },
+  });
+}
+
+// Self-service account deactivation (soft delete) — requires re-entering
+// the current password, same confirmation pattern as changePassword.
+// Patient-only on the backend.
+export function deactivateMyAccount(currentPassword) {
+  return request("/auth/me", {
+    method: "DELETE",
+    body: { current_password: currentPassword },
   });
 }
 
@@ -106,6 +139,25 @@ export function getPatientAppointmentHistory(patientId) {
   return request(`/admin/patients/${patientId}`);
 }
 
+export function deactivatePatientAsAdmin(patientId) {
+  return request(`/admin/patients/${patientId}/deactivate`, { method: "POST" });
+}
+
+// Admin-only: every doctor regardless of active status (unlike
+// listDoctors() above, which the public/booking flow uses and only
+// returns active doctors).
+export function listAllDoctorsAsAdmin() {
+  return request("/admin/doctors");
+}
+
+export function deactivateDoctorAsAdmin(doctorId) {
+  return request(`/admin/doctors/${doctorId}/deactivate`, { method: "POST" });
+}
+
+export function reactivateDoctorAsAdmin(doctorId) {
+  return request(`/admin/doctors/${doctorId}/reactivate`, { method: "POST" });
+}
+
 // ---------- Availability ----------
 
 export function listAvailability(doctorId) {
@@ -125,6 +177,22 @@ export function updateAvailability(doctorId, availabilityId, data) {
 
 export function deleteAvailability(doctorId, availabilityId) {
   return request(`/doctors/${doctorId}/availability/${availabilityId}`, { method: "DELETE" });
+}
+
+// A recurring break inside one availability window (e.g. a lunch break) —
+// the window's GET response already returns its breaks nested (see
+// listAvailability above), so there's no separate list function.
+export function createAvailabilityBreak(doctorId, availabilityId, data) {
+  return request(`/doctors/${doctorId}/availability/${availabilityId}/breaks`, {
+    method: "POST",
+    body: data,
+  });
+}
+
+export function deleteAvailabilityBreak(doctorId, availabilityId, breakId) {
+  return request(`/doctors/${doctorId}/availability/${availabilityId}/breaks/${breakId}`, {
+    method: "DELETE",
+  });
 }
 
 // visitType is one of VISIT_TYPES (see below) — the backend resolves this

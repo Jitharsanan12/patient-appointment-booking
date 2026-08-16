@@ -1,0 +1,37 @@
+/*
+  Delete Account page — reuses ChangePassword.css's page wrapper/heading
+  and AuthPages.css's card/input/button system (see those files), so this
+  only adds what's new here: the warning callout and a red variant of
+  .auth-button for the irreversible-feeling action.
+*/
+
+.delete-account-warning {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  background: #fde8e8;
+  border: 1px solid #f3b8b8;
+  border-radius: 0.5rem;
+  color: #8f1414;
+}
+
+.delete-account-warning .material-symbols-outlined {
+  flex-shrink: 0;
+  font-size: 20px;
+}
+
+.delete-account-warning p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.auth-card--change-password .auth-button--danger {
+  background: #ba1a1a;
+}
+
+.auth-card--change-password .auth-button--danger:hover {
+  background: #8f1414;
+}

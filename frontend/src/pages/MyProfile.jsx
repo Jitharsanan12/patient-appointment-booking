@@ -21,6 +21,39 @@ function toFormValues(profile) {
   return values;
 }
 
+// Digits only, optional leading "+" for a country code, 7-15 digits —
+// mirrors validate_phone in the backend's app/validators.py exactly, so
+// anything rejected here would also be rejected there.
+const PHONE_PATTERN = /^\+?\d{7,15}$/;
+
+// Mirrors the backend's own checks (see PatientProfileUpdate in
+// app/schemas.py) for instant feedback — every field here is optional,
+// so each check only runs when that field actually has a value.
+function validate(form) {
+  if (form.phone_number && !PHONE_PATTERN.test(form.phone_number)) {
+    return "Phone number must be 7-15 digits, with an optional leading + for the country code";
+  }
+  if (form.emergency_contact_phone && !PHONE_PATTERN.test(form.emergency_contact_phone)) {
+    return "Emergency contact phone must be 7-15 digits, with an optional leading + for the country code";
+  }
+  if (form.date_of_birth) {
+    // Comparing plain "YYYY-MM-DD" strings sorts correctly and sidesteps
+    // the timezone pitfalls of parsing them into Date objects — same
+    // "today" string format already used for the date input's own `min`
+    // elsewhere in this app (e.g. BookingForm/UnavailableDatesManager).
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (form.date_of_birth > todayStr) {
+      return "Date of birth cannot be in the future";
+    }
+    const earliest = new Date();
+    earliest.setFullYear(earliest.getFullYear() - 120);
+    if (form.date_of_birth < earliest.toISOString().slice(0, 10)) {
+      return "Date of birth cannot be more than 120 years ago";
+    }
+  }
+  return "";
+}
+
 export default function MyProfile() {
   const [form, setForm] = useState(BLANK_PROFILE);
   const [loading, setLoading] = useState(true);
@@ -43,6 +76,13 @@ export default function MyProfile() {
     e.preventDefault();
     setError("");
     setSuccess("");
+
+    const validationError = validate(form);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setSaving(true);
     try {
       // An empty field means "not provided" — send null rather than ""
@@ -98,6 +138,7 @@ export default function MyProfile() {
               <input
                 id="phone-number"
                 className="profile-input"
+                type="tel"
                 value={form.phone_number}
                 onChange={(e) => updateField("phone_number", e.target.value)}
               />
@@ -172,6 +213,7 @@ export default function MyProfile() {
               <input
                 id="emergency-contact-phone"
                 className="profile-input"
+                type="tel"
                 value={form.emergency_contact_phone}
                 onChange={(e) => updateField("emergency_contact_phone", e.target.value)}
               />

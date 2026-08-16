@@ -12,6 +12,7 @@ import {
   clearToken,
   loginUser,
   registerUser,
+  reactivateAccount,
 } from "../api/client";
 
 const AuthContext = createContext(null);
@@ -50,13 +51,25 @@ export function AuthProvider({ children }) {
     return login(data.email, data.password);
   }
 
+  // Same shape as login() (store the token, fetch /auth/me, set user) —
+  // reactivateAccount already re-verified the password and flipped
+  // is_active server-side, so this just finishes signing them in the
+  // same way a normal login would.
+  async function reactivate(email, password) {
+    const { access_token } = await reactivateAccount(email, password);
+    setToken(access_token);
+    const currentUser = await getMe();
+    setUser(currentUser);
+    return currentUser;
+  }
+
   function logout() {
     clearToken();
     setUser(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, reactivate }}>
       {children}
     </AuthContext.Provider>
   );

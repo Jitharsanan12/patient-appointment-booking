@@ -16,7 +16,12 @@ resend.api_key = os.getenv("RESEND_API_KEY")
 # verify your own domain with Resend — it can only deliver to the email
 # address you signed up to Resend with, not to arbitrary recipients. See the
 # README for details. Swap this for "you@yourdomain.com" once you verify one.
-FROM_EMAIL = "Appointment Booking <onboarding@resend.dev>"
+FROM_EMAIL = "CareSlot <onboarding@resend.dev>"
+
+# Base URL of the frontend, used to build links inside emails (currently
+# just the password reset link below). Overridable via env for anywhere
+# the frontend isn't running on its Vite dev default.
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 
 def _send_email(to_email: str, subject: str, html: str) -> bool:
@@ -60,7 +65,7 @@ def send_doctor_welcome_email(to_email: str, full_name: str, temporary_password:
         (
             f"<p>Hi {full_name},</p>"
             f"<p>An admin has created a doctor account for you on the "
-            f"Patient Appointment Booking system.</p>"
+            f"CareSlot system.</p>"
             f"<p><strong>Login email:</strong> {to_email}<br>"
             f"<strong>Temporary password:</strong> {temporary_password}</p>"
             f"<p>Please log in and change your password as soon as possible.</p>"
@@ -112,6 +117,28 @@ def send_appointment_cancelled_email_to_doctor(
             f"<p>{patient_name}'s appointment scheduled for "
             f"<strong>{appointment_time}</strong> has been cancelled.</p>"
             f"<p>This time slot is now free.</p>"
+        ),
+    )
+
+
+def send_password_reset_email(to_email: str, full_name: str, reset_token: str) -> bool:
+    """
+    Emails a password reset link. Only ever called (see forgot_password in
+    routers/auth.py) after confirming the email belongs to a real user —
+    the endpoint itself always returns the same generic response either
+    way, so this function's normal fail-soft behavior (see _send_email)
+    never leaks whether a given address is registered.
+    """
+    reset_url = f"{FRONTEND_URL}/reset-password?token={reset_token}"
+    return _send_email(
+        to_email,
+        "Reset your password",
+        (
+            f"<p>Hi {full_name},</p>"
+            f"<p>We received a request to reset your password. Click the link below to "
+            f"choose a new one — this link expires in 30 minutes.</p>"
+            f'<p><a href="{reset_url}">{reset_url}</a></p>'
+            f"<p>If you didn't request a password reset, you can safely ignore this email.</p>"
         ),
     )
 

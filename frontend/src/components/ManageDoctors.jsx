@@ -5,7 +5,13 @@
 */
 
 import { useEffect, useState } from "react";
-import { listDoctors, createDoctorAsAdmin } from "../api/client";
+import {
+  listAllDoctorsAsAdmin,
+  createDoctorAsAdmin,
+  deactivateDoctorAsAdmin,
+  reactivateDoctorAsAdmin,
+} from "../api/client";
+import PasswordVisibilityToggle from "./PasswordVisibilityToggle";
 import "../pages/DoctorDashboard.css";
 import "../pages/DoctorList.css";
 import "../pages/AdminDashboard.css";
@@ -42,15 +48,21 @@ export default function ManageDoctors() {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deactivatingId, setDeactivatingId] = useState(null);
+  const [reactivatingId, setReactivatingId] = useState(null);
 
   const [form, setForm] = useState(EMPTY_FORM);
+  const [showPassword, setShowPassword] = useState(false);
   // Holds the just-created doctor's login + temporary password, shown once
   // right after creation (the backend never returns it again after this).
   const [createdDoctor, setCreatedDoctor] = useState(null);
 
   function load() {
     setLoading(true);
-    listDoctors()
+    // The admin-only listing (unlike listDoctors(), which the public
+    // booking flow uses) returns every doctor regardless of status, so
+    // deactivated doctors still show up here to manage.
+    listAllDoctorsAsAdmin()
       .then(setDoctors)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -58,14 +70,80 @@ export default function ManageDoctors() {
 
   useEffect(load, []);
 
+  async function handleDeactivate(doctor) {
+    const confirmed = window.confirm(
+      `Deactivate Dr. ${doctor.full_name}? They will no longer be able to log in, and will ` +
+        `disappear from patients' booking list. Their existing appointments and history are kept exactly as they are.`
+    );
+    if (!confirmed) return;
+
+    setError("");
+    setDeactivatingId(doctor.id);
+    try {
+      await deactivateDoctorAsAdmin(doctor.id);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeactivatingId(null);
+    }
+  }
+
+  // Doctors can't do this themselves (see POST /auth/reactivate in
+  // routers/auth.py, which explicitly rejects any non-patient role) —
+  // this admin action is the only way a deactivated doctor comes back.
+  async function handleReactivate(doctor) {
+    const confirmed = window.confirm(
+      `Reactivate Dr. ${doctor.full_name}? They will be able to log in again and reappear in ` +
+        `patients' booking list.`
+    );
+    if (!confirmed) return;
+
+    setError("");
+    setReactivatingId(doctor.id);
+    try {
+      await reactivateDoctorAsAdmin(doctor.id);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReactivatingId(null);
+    }
+  }
+
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  // Mirrors the backend's own checks (see AdminCreateDoctorRequest in
+  // app/schemas.py). Password is optional here (blank means "auto-
+  // generate one"), so it's only length-checked when the admin actually
+  // types one.
+  function validate() {
+    const name = form.full_name.trim();
+    if (name.length < 2) {
+      return "Full name must be at least 2 characters long";
+    }
+    if (/^\d+$/.test(name.replace(/\s/g, ""))) {
+      return "Full name cannot be only numbers";
+    }
+    if (form.password && form.password.length < 8) {
+      return "Password must be at least 8 characters long";
+    }
+    return "";
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setCreatedDoctor(null);
+
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     try {
       const payload = {
         email: form.email,
@@ -141,14 +219,21 @@ export default function ManageDoctors() {
             <label className="dashboard-label" htmlFor="doctor-password">
               Password (optional)
             </label>
-            <input
-              id="doctor-password"
-              className="dashboard-input"
-              type="text"
-              value={form.password}
-              onChange={(e) => updateField("password", e.target.value)}
-              placeholder="Leave blank to auto-generate"
-            />
+            <div className="dashboard-input-wrap">
+              <input
+                id="doctor-password"
+                className="dashboard-input dashboard-input--toggle-right"
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                onChange={(e) => updateField("password", e.target.value)}
+                placeholder="Leave blank to auto-generate"
+                minLength={8}
+              />
+              <PasswordVisibilityToggle
+                visible={showPassword}
+                onToggle={() => setShowPassword((prev) => !prev)}
+              />
+            </div>
           </div>
           <button type="submit" className="dashboard-button">
             Create doctor
@@ -192,6 +277,34 @@ export default function ManageDoctors() {
                       <p className="admin-doctor-name">{d.full_name}</p>
                       <p className="admin-doctor-specialty">{d.specialization}</p>
                     </div>
+                  </div>
+                  <div className="admin-table-actions">
+                    <span
+                      className={`admin-status-badge admin-status-badge--${
+                        d.is_active ? "active" : "inactive"
+                      }`}
+                    >
+                      {d.is_active ? "Active" : "Inactive"}
+                    </span>
+                    {d.is_active ? (
+                      <button
+                        type="button"
+                        className="admin-cancel-link"
+                        onClick={() => handleDeactivate(d)}
+                        disabled={deactivatingId === d.id}
+                      >
+                        {deactivatingId === d.id ? "Deactivating..." : "Deactivate"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="admin-reactivate-link"
+                        onClick={() => handleReactivate(d)}
+                        disabled={reactivatingId === d.id}
+                      >
+                        {reactivatingId === d.id ? "Reactivating..." : "Reactivate"}
+                      </button>
+                    )}
                   </div>
                 </li>
               );

@@ -85,6 +85,31 @@
   cursor: not-allowed;
 }
 
+/* Same shape as .admin-cancel-link above, teal instead of red — the
+   reverse action (Manage Doctors' "Reactivate", shown only when a
+   doctor is currently inactive). */
+.admin-reactivate-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #006a61;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 200ms;
+}
+
+.admin-reactivate-link:hover:not(:disabled) {
+  color: #004943;
+  text-decoration: underline;
+}
+
+.admin-reactivate-link:disabled {
+  color: #c6c6cd;
+  cursor: not-allowed;
+}
+
 /* ---------- Section spacing (Book Appointment card sits above the table) ---------- */
 
 .admin-section {
@@ -114,4 +139,36 @@
   margin: 2px 0 0;
   font-size: 13px;
   color: #45464d;
+}
+
+/* ---------- Active/inactive account status badge (Patients, Manage Doctors) ----------
+   Same pill shape as .appointment-badge (MyAppointments.css), separate
+   class since this describes an ACCOUNT's status, not an appointment's. */
+
+.admin-status-badge {
+  display: inline-block;
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-status-badge--active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.admin-status-badge--inactive {
+  background: #fde8e8;
+  color: #c22e2e;
+}
+
+/* ---------- Multiple action buttons sharing one table cell (Patients, Manage Doctors) ---------- */
+
+.admin-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }

@@ -6,6 +6,8 @@ import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import MyAppointments from "./pages/MyAppointments";
 import DoctorDashboard from "./pages/DoctorDashboard";
 import DoctorSettings from "./pages/DoctorSettings";
@@ -13,13 +15,14 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminDoctors from "./pages/AdminDoctors";
 import AdminPatients from "./pages/AdminPatients";
 import ChangePassword from "./pages/ChangePassword";
+import DeleteAccount from "./pages/DeleteAccount";
 import MyProfile from "./pages/MyProfile";
 
 // Routes whose own page design replaces the navbar (the Login/Register
 // cards already have their own logo + heading — showing the navbar too
 // would be redundant). Kept as a small explicit list rather than e.g. a
 // route param, since it's just these two pages and unlikely to grow.
-const NAVBAR_HIDDEN_ROUTES = ["/login", "/register"];
+const NAVBAR_HIDDEN_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password"];
 
 // Needs to be a component rendered INSIDE <BrowserRouter> (not App itself)
 // so it can call useLocation() to know the current path.
@@ -42,6 +45,8 @@ function AppLayout() {
           />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route
             path="/my-appointments"
             element={
@@ -103,6 +108,14 @@ function AppLayout() {
             element={
               <ProtectedRoute role="patient">
                 <MyProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/delete-account"
+            element={
+              <ProtectedRoute role="patient">
+                <DeleteAccount />
               </ProtectedRoute>
             }
           />

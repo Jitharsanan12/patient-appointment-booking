@@ -43,7 +43,7 @@ export default function Navbar() {
     <nav className="navbar">
       <Link to="/" className="navbar-brand">
         <img className="navbar-logo" src={logo} alt="" />
-        Appointment Booking
+        CareSlot
       </Link>
       <div className="navbar-links">
         {!user && (
@@ -103,6 +103,16 @@ export default function Navbar() {
                 >
                   Change Password
                 </Link>
+                {user.role === "patient" && (
+                  <Link
+                    to="/delete-account"
+                    className="navbar-dropdown-item navbar-dropdown-item--danger"
+                    role="menuitem"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Delete Account
+                  </Link>
+                )}
                 <button
                   type="button"
                   className="navbar-dropdown-item navbar-dropdown-item--danger"

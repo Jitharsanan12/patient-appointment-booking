@@ -1,4 +1,4 @@
-# Patient Appointment Booking System
+# CareSlot
 
 A full-stack appointment booking app: patients book appointments with doctors, doctors manage their schedule, and admins can see everything.
 

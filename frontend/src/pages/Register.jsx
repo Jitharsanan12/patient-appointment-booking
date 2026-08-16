@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import PasswordVisibilityToggle from "../components/PasswordVisibilityToggle";
 import logo from "../assets/logo.png";
 import "./AuthPages.css";
 
@@ -17,15 +18,41 @@ export default function Register() {
     email: "",
     password: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  // Mirrors the backend's own checks (see PatientRegister in
+  // app/schemas.py) so the user gets the same specific message instantly
+  // instead of waiting on a round trip — the backend re-checks all of
+  // this regardless, since it's the real enforcement layer.
+  function validate() {
+    const name = form.full_name.trim();
+    if (name.length < 2) {
+      return "Full name must be at least 2 characters long";
+    }
+    if (/^\d+$/.test(name.replace(/\s/g, ""))) {
+      return "Full name cannot be only numbers";
+    }
+    if (form.password.length < 8) {
+      return "Password must be at least 8 characters long";
+    }
+    return "";
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     try {
       await register(form);
       navigate("/");
@@ -38,8 +65,8 @@ export default function Register() {
     <div className="auth-page">
       <div className="auth-card auth-card--register">
         <div className="auth-brand">
-          <img className="auth-logo" src={logo} alt="Appointment Booking Logo" />
-          <h1 className="auth-heading">Appointment Booking</h1>
+          <img className="auth-logo" src={logo} alt="CareSlot Logo" />
+          <h1 className="auth-heading">CareSlot</h1>
           <p className="auth-subtitle">Create your account to get started.</p>
         </div>
 
@@ -94,12 +121,17 @@ export default function Register() {
               </span>
               <input
                 id="password"
-                className="auth-input"
-                type="password"
+                className="auth-input auth-input--toggle-right"
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={form.password}
                 onChange={(e) => updateField("password", e.target.value)}
+                minLength={8}
                 required
+              />
+              <PasswordVisibilityToggle
+                visible={showPassword}
+                onToggle={() => setShowPassword((prev) => !prev)}
               />
             </div>
           </div>

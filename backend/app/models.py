@@ -13,6 +13,7 @@ from sqlalchemy import (
     DateTime,
     Time,
     Date,
+    Boolean,
     ForeignKey,
     Enum,
     UniqueConstraint,
@@ -68,6 +69,23 @@ class User(Base):
     full_name = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    # Soft-delete flag. False means the account is deactivated — see
+    # DELETE /auth/me (patient self-deactivation) and the admin
+    # deactivate endpoints in routers/admin.py. A deactivated account's
+    # appointments, profile, and history are never touched — only this
+    # flag changes, which get_current_user (app/auth.py) and login
+    # (routers/auth.py) then check to lock the account out.
+    is_active = Column(Boolean, nullable=False, default=True)
+
+    # "Forgot password" support (see POST /auth/forgot-password and
+    # /auth/reset-password in routers/auth.py). Both null most of the
+    # time — only set between a reset being requested and either being
+    # used or expiring. reset_token is unique/indexed for the same
+    # reason email is: it's how reset_password looks the user up, and a
+    # random 32-byte token should never collide anyway.
+    reset_token = Column(String, unique=True, index=True, nullable=True)
+    reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
 
     # If this user is a doctor, this links to their extra profile info.
     # uselist=False makes this a one-to-one relationship instead of a list.
@@ -177,18 +195,50 @@ class Availability(Base):
     slot_duration_minutes = Column(Integer, nullable=False, default=30)
 
     doctor = relationship("Doctor", back_populates="availability_windows")
+    breaks = relationship(
+        "AvailabilityBreak", back_populates="availability", cascade="all, delete-orphan"
+    )
+
+
+class AvailabilityBreak(Base):
+    """
+    A recurring break inside one Availability window — e.g. a short
+    mid-morning break, or a lunch break. Just like the window itself, a
+    break has no specific date: it's a plain Time range that recurs every
+    week the window is active. One window can have zero, one, or several
+    of these (e.g. a mid-morning break AND a separate lunch break).
+
+    compute_available_slots (routers/doctors.py) subtracts every break
+    linked to a window from that window's working hours each time it
+    computes slots for a date that falls on the window's day_of_week —
+    the exact same interval-subtraction approach already used for booked
+    appointments and date overrides, just driven by a recurring Time
+    range instead of a specific booked datetime.
+    """
+    __tablename__ = "availability_breaks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    availability_id = Column(Integer, ForeignKey("availability.id"), nullable=False)
+    break_start = Column(Time, nullable=False)
+    break_end = Column(Time, nullable=False)
+
+    availability = relationship("Availability", back_populates="breaks")
 
 
 class AvailabilityOverride(Base):
     """
-    A one-off exception that blocks a doctor's normal weekly availability
-    for a single specific date (e.g. a public holiday or a day off) —
+    A one-off exception to a doctor's normal weekly availability for a
+    single specific date (e.g. a public holiday or a day off) —
     regardless of what their recurring Availability windows say for that
     day of the week.
 
-    We only model "block this date" (not "add extra hours on this date")
-    since that's what was asked for; the UniqueConstraint stops a doctor
-    from accidentally creating the same override twice.
+    By default this blocks the ENTIRE date (blocked_start/blocked_end
+    both left null) — the UniqueConstraint stops a doctor from
+    accidentally creating the same override twice. If blocked_start and
+    blocked_end are both set instead, only that time range is blocked on
+    the date, and the rest of the day is computed normally (see
+    compute_available_slots) — e.g. blocking just 12:00-13:00 for a
+    dentist appointment, while staying bookable the rest of the day.
     """
     __tablename__ = "availability_overrides"
 
@@ -196,6 +246,10 @@ class AvailabilityOverride(Base):
     doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False)
     date = Column(Date, nullable=False)
     reason = Column(String, nullable=True)
+    # Both null = block the whole day (the original, still-default
+    # behavior). Both set = block only that range on this date.
+    blocked_start = Column(Time, nullable=True)
+    blocked_end = Column(Time, nullable=True)
 
     doctor = relationship("Doctor", back_populates="unavailable_dates")
 

@@ -281,6 +281,58 @@
   background: #213145;
 }
 
+/* Outlined variant of .auth-button — used for the "reactivate account"
+   action below, which is an offer, not the primary Sign In action, so it
+   shouldn't compete with the solid black button for attention. */
+.auth-button--secondary {
+  background: #ffffff;
+  color: #006a61;
+  border: 1px solid #006a61;
+}
+
+/* Beats .auth-card--login .auth-button's margin-top:8px (same
+   specificity, declared earlier) so the button sits flush under the
+   prompt text — the surrounding .auth-reactivate-prompt's own flex gap
+   already provides that spacing. */
+.auth-card--login .auth-button--secondary {
+  margin-top: 0;
+}
+
+.auth-button--secondary:hover {
+  background: #eefaf8;
+}
+
+.auth-button--secondary:disabled {
+  color: #c6c6cd;
+  border-color: #c6c6cd;
+  cursor: not-allowed;
+  background: #ffffff;
+}
+
+/* ---------- Reactivation offer (Login) ----------
+   Shown in place of a plain error when login() reports the account is
+   deactivated (see DEACTIVATED_MESSAGE in Login.jsx) — a neutral/teal
+   callout rather than the red .delete-account-warning tone, since this
+   is an offer to fix things, not a warning about a destructive action. */
+
+.auth-reactivate-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: -4px;
+  padding: 12px 16px;
+  background: #eefaf8;
+  border: 1px solid #6bd8cb;
+  border-radius: 0.5rem;
+}
+
+.auth-reactivate-prompt p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0b1c30;
+}
+
 .auth-footer {
   margin-top: 32px;
   text-align: center;
@@ -325,4 +377,69 @@
   font-size: 14px;
   line-height: 20px;
   color: #ba1a1a;
+}
+
+/* ---------- Password visibility toggle ----------
+   Shared by every password field in the app, always on the right —
+   in the Login/Change-Password/Reset-Password cards (icon-right by
+   default) it sits in the same spot the decorative lock icon used to;
+   in the Register card (icon-left by default) it's an addition
+   alongside that card's own left-side lock icon, which is what the
+   extra right padding below reserves room for. */
+
+.password-visibility-toggle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 12px 0 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  color: #c6c6cd;
+  transition: color 200ms;
+}
+
+.password-visibility-toggle:hover {
+  color: #76777d;
+}
+
+.password-visibility-toggle .material-symbols-outlined {
+  font-size: 20px;
+}
+
+/* Register's password input already has padding-left:40px reserved for
+   its own left-side lock icon (see .auth-card--register .auth-input) —
+   this adds the matching padding-right for the toggle now sharing that
+   same field. */
+.auth-input--toggle-right {
+  padding-right: 40px;
+}
+
+/* ---------- Post-submit confirmation state (Forgot/Reset Password) ----------
+   Replaces the form once the request/reset has gone through — same card,
+   just swapping its content, rather than a separate page. */
+
+.auth-confirmation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.auth-confirmation .material-symbols-outlined {
+  font-size: 32px;
+  color: #006a61;
+}
+
+.auth-confirmation p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: #45464d;
 }

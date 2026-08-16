@@ -18,7 +18,7 @@ from app.routers import auth, doctors, appointments, admin, patients
 # like Alembic instead, so schema changes are tracked and reversible.)
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Patient Appointment Booking API")
+app = FastAPI(title="CareSlot API")
 
 # Allows our React frontend (running on a different port during development)
 # to make requests to this API. Without this, the browser blocks the requests.
@@ -39,4 +39,4 @@ app.include_router(patients.router)
 
 @app.get("/")
 def root():
-    return {"message": "Patient Appointment Booking API is running"}
+    return {"message": "CareSlot API is running"}

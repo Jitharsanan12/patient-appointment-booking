@@ -1,7 +1,13 @@
 /*
-  Lets a doctor block one-off dates (e.g. a holiday or a day off) —
-  this overrides their normal weekly availability for that single date,
-  regardless of what day of the week it falls on. Used inside DoctorDashboard.
+  Lets a doctor block a one-off date (e.g. a holiday or a day off) — this
+  overrides their normal weekly availability for that single date,
+  regardless of what day of the week it falls on. Used inside
+  DoctorDashboard.
+
+  A block can cover the WHOLE date (the original, still-default
+  behavior) or just a specific hour range on that date (e.g. blocking
+  12:00-13:00 for a personal appointment while staying bookable the rest
+  of the day) — see the "Block Type" toggle below.
 */
 
 import { useEffect, useState } from "react";
@@ -20,6 +26,11 @@ export default function UnavailableDatesManager({ doctorId }) {
 
   const [date, setDate] = useState("");
   const [reason, setReason] = useState("");
+  // "day" = block the whole date (default, original behavior). "hours" =
+  // block only the range given by blockedStart/blockedEnd below.
+  const [blockMode, setBlockMode] = useState("day");
+  const [blockedStart, setBlockedStart] = useState("");
+  const [blockedEnd, setBlockedEnd] = useState("");
 
   function load() {
     setLoading(true);
@@ -31,13 +42,25 @@ export default function UnavailableDatesManager({ doctorId }) {
 
   useEffect(load, [doctorId]);
 
+  function resetForm() {
+    setDate("");
+    setReason("");
+    setBlockMode("day");
+    setBlockedStart("");
+    setBlockedEnd("");
+  }
+
   async function handleAdd(e) {
     e.preventDefault();
     setError("");
     try {
-      await createUnavailableDate(doctorId, { date, reason: reason || null });
-      setDate("");
-      setReason("");
+      await createUnavailableDate(doctorId, {
+        date,
+        reason: reason || null,
+        blocked_start: blockMode === "hours" ? `${blockedStart}:00` : null,
+        blocked_end: blockMode === "hours" ? `${blockedEnd}:00` : null,
+      });
+      resetForm();
       load();
     } catch (err) {
       setError(err.message);
@@ -59,7 +82,8 @@ export default function UnavailableDatesManager({ doctorId }) {
       <h3 className="dashboard-card-title">Block a Date</h3>
       <p className="dashboard-card-subtitle">
         Mark a specific date as unavailable — e.g. a holiday — even if it falls on a day you
-        normally work. Patients won't see any open slots for that date.
+        normally work. Patients won't see any open slots for that date, or just that time range if
+        you block specific hours instead.
       </p>
       <form onSubmit={handleAdd} className="dashboard-form">
         <div className="dashboard-field">
@@ -76,6 +100,70 @@ export default function UnavailableDatesManager({ doctorId }) {
             required
           />
         </div>
+
+        <div className="dashboard-field">
+          <span className="dashboard-label">Block Type</span>
+          <div className="segmented-control" role="tablist" aria-label="Block type">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={blockMode === "day"}
+              className={
+                "segmented-control-option" +
+                (blockMode === "day" ? " segmented-control-option--active" : "")
+              }
+              onClick={() => setBlockMode("day")}
+            >
+              Entire Day
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={blockMode === "hours"}
+              className={
+                "segmented-control-option" +
+                (blockMode === "hours" ? " segmented-control-option--active" : "")
+              }
+              onClick={() => setBlockMode("hours")}
+            >
+              Specific Hours
+            </button>
+          </div>
+        </div>
+
+        <div
+          className={
+            "block-hours-fields" + (blockMode === "hours" ? " block-hours-fields--visible" : "")
+          }
+        >
+          <div className="dashboard-field">
+            <label className="dashboard-label" htmlFor="block-start">
+              Start Time
+            </label>
+            <input
+              id="block-start"
+              className="dashboard-input"
+              type="time"
+              value={blockedStart}
+              onChange={(e) => setBlockedStart(e.target.value)}
+              required={blockMode === "hours"}
+            />
+          </div>
+          <div className="dashboard-field">
+            <label className="dashboard-label" htmlFor="block-end">
+              End Time
+            </label>
+            <input
+              id="block-end"
+              className="dashboard-input"
+              type="time"
+              value={blockedEnd}
+              onChange={(e) => setBlockedEnd(e.target.value)}
+              required={blockMode === "hours"}
+            />
+          </div>
+        </div>
+
         <div className="dashboard-field">
           <label className="dashboard-label" htmlFor="block-reason">
             Reason (optional)
@@ -104,7 +192,14 @@ export default function UnavailableDatesManager({ doctorId }) {
           {dates.map((d) => (
             <li key={d.id} className="dashboard-list-item">
               <span>
-                {d.date} {d.reason && <span className="muted">— {d.reason}</span>}
+                {d.date}
+                {d.blocked_start && (
+                  <span className="muted">
+                    {" "}
+                    · {d.blocked_start.slice(0, 5)}–{d.blocked_end.slice(0, 5)}
+                  </span>
+                )}
+                {d.reason && <span className="muted"> — {d.reason}</span>}
               </span>
               <div className="dashboard-list-item-actions">
                 <button
